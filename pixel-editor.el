@@ -1,0 +1,66 @@
+
+(defun pixel-pic-action (input id &optional x y pos)
+  (print (format "%s %s %d %d" (prin1-to-string input) id x y))
+  nil)
+
+(defun pixel-make-pic-action (input id &optional x y)
+  (eval `(lambda (&optional pos)
+           (interactive)
+           (pixel-pic-action (quote ,input) ,id ,x ,y pos))))
+
+(defun pixel-make-pic-keymap (id &optional x y)
+  (let ((map (make-sparse-keymap)))
+    (suppress-keymap map)
+    (define-key map (kbd "<RET>") (pixel-make-pic-action 'keyboard id x y))
+    (define-key map (kbd "<SPC>") (pixel-make-pic-action 'keyboard id x y))
+    (define-key map (kbd "<double-mouse-1>") (pixel-make-pic-action 'mouse1 id x y))
+    (define-key map (kbd "<double-mouse-2>") (pixel-make-pic-action 'mouse2 id x y))
+    (define-key map (kbd "<double-mouse-3>") (pixel-make-pic-action 'mouse3 id x y))
+    (define-key map (kbd "<down-mouse-1>") (pixel-make-pic-action 'mouse1 id x y))
+    (define-key map (kbd "<down-mouse-2>") (pixel-make-pic-action 'mouse2 id x y))
+    (define-key map (kbd "<down-mouse-3>") (pixel-make-pic-action 'mouse3 id x y))
+    (define-key map (kbd "<drag-mouse-1>") 'pixel-pic-drag)
+    (define-key map (kbd "<drag-mouse-2>") 'pixel-pic-drag)
+    (define-key map (kbd "<drag-mouse-3>") 'pixel-pic-drag)
+    map))
+
+(defun pixel-pic-drag (event)
+  (interactive "e")
+  (print event))
+
+;; (mouse-set-point event)
+;; (let (event)
+;;   (track-mouse
+;;     (while (progn
+;;              (setq event (read-event))
+;;              (or (mouse-movement-p event)
+;;                  (memq (car-safe event) '(switch-frame select-window))))
+;;       (mouse-set-point event))))
+
+(defun pixel-palette-action (input id &optional color pos)
+  (print (format "%s %s %s" (prin1-to-string input) id color))
+  nil)
+
+(defun pixel-make-palette-action (input id &optional color)
+  (eval `(lambda (&optional pos)
+           (interactive)
+           (pixel-palette-action (quote ,input) ,id ,color pos))))
+
+(defun pixel-make-palette-keymap (id &optional color)
+  (let ((map (make-sparse-keymap)))
+    (suppress-keymap map)
+    (define-key map (kbd "<RET>") (pixel-make-palette-action 'keyboard id color))
+    (define-key map (kbd "<SPC>") (pixel-make-palette-action 'keyboard id color))
+    (define-key map (kbd "<down-mouse-1>") (pixel-make-palette-action 'mouse1 id color))
+    (define-key map (kbd "<down-mouse-2>") (pixel-make-palette-action 'mouse2 id color))
+    (define-key map (kbd "<down-mouse-3>") (pixel-make-palette-action 'mouse3 id color))
+    (define-key map (kbd "<drag-mouse-1>") 'pixel-palette-drag)
+    (define-key map (kbd "<drag-mouse-2>") 'pixel-palette-drag)
+    (define-key map (kbd "<drag-mouse-3>") 'pixel-palette-drag)
+    map))
+
+(defun pixel-palette-drag (event)
+  (interactive "e")
+  (print event))
+
+(provide 'pixel-editor)

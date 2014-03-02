@@ -2,6 +2,8 @@
 (require 'cl)
 (require 'color)
 
+(require 'pixel-editor)
+
 (defun pixel-index (pic x y)
   (+ (* y (plist-get pic :w)) x))
 
@@ -181,60 +183,96 @@
 ;;                                               :ascent center
 ;;                                               :color-symbols ,colors))))))
 
+;; (defun* pixel-palette-regex (&key (id nil) (mm nil) (quick nil))
+;;   (if id
+;;       (setq id (regexp-quote id))
+;;     (setq id "[^ \t\n]+"))
+;;   (unless mm
+;;     (setq mm major-mode))
+;;   (cond ((or t ;; REMOVE THIS
+;;              (eq mm 'c-mode)
+;;              (eq mm 'cc-mode)
+;;              (eq mm 'c++-mode))
+;;          (if quick
+;;              (concat "^[ \t/\*;#%]*\\(?:\\<palette\\|\\<pic\\>\\):[ \t]+\\(" id "\\)\n")
+;;            (concat "^[ \t/\*;#%]*\\(?:\\<palette\\>\\|\\<pic\\>\\):[ \t]+\\(" id "\\)\n"
+;;                    "\\(\\)" 
+;;                    "[^[(\"]*" pixel-c-types-regex "[ \t]+[^[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(\\)\\].*{\n?"
+;;                    "\\(\\([ \t/\*;#%]*\\([0-9\\.]+\\|[0-9]+\\),?[ \t]*\n?\\)+\\).*"
+;;                    "};"
+;;                    )))))
 
 (defvar pixel-c-types-regex "\\(int\\|bool\\|float\\)")
 
-(defun* pixel-pic-regex (&key (id nil) (mm nil) (quick nil))
-  (if id
-      (setq id (regexp-quote id))
-    (setq id "[^ \t\n]+"))
+(defun* pixel-regex (&key (pic nil) (palette nil) (id nil) (mm nil) (quick nil))
   (unless mm
     (setq mm major-mode))
-  (let ((palette-id "[^ \t\n]+"))
+  (unless (or palette pic)
+    (setq palette t
+          pic t))
+  (let* ((palette-id (or (and (stringp palette) palette) "[^ \t\n]+"))
+         (init (cond ((or (stringp palette) (and palette pic)) "\\(?:\\<palette\\>\\|\\<pic\\>\\)")
+                     (palette "\\<palette\\>")
+                     (pic "\\<pic\\>")))
+         (using-optional (and (or (not (stringp palette))
+                                  (string-equal palette id))
+                              "?")))
+    (if id
+        (setq id (regexp-quote id))
+      (setq id "[^ \t\n]+"))
     (cond ((or t ;; REMOVE THIS
                (eql mm 'c-mode)
                (eql mm 'cc-mode)
                (eql mm 'c++-mode))
            (if quick
-               (concat "^[ \t/\*;#%]*pic:[ \t]*\\(" id "\\)\n")
-             (concat "^[ \t/\*;#%]*pic:[ \t]*\\(" id "\\)\n"
-                     "[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)\n"
-                     "[^[(\"]*" pixel-c-types-regex "[ \t]+[^[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\].*{\n?"
+               (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
+                       "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)\n\\)" using-optional)
+             (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
+                     "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)\n\\)" using-optional
+                     "[^[(\"]*" pixel-c-types-regex "[ \t]+[^[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\].*{\n?"
                      "\\(\\([ \t/\*;#%]*\\([0-9\\.]+\\|[0-9]+\\),?[ \t]*\n?\\)+\\).*"
                      "};"
                      ))))))
 
-(defun* pixel-palette-regex (&key (id nil) (mm nil) (quick nil))
-  (if id
-      (setq id (regexp-quote id))
-    (setq id "[^ \t\n]+"))
-  (unless mm
-    (setq mm major-mode))
-  (cond ((or t ;; REMOVE THIS
-             (eq mm 'c-mode)
-             (eq mm 'cc-mode)
-             (eq mm 'c++-mode))
-         (if quick
-             (concat "^[ \t/\*;#%]*palette:[ \t]+\\(" id "\\)\n")
-           (concat "^[ \t/\*;#%]*palette:[ \t]+\\(" id "\\)\n"
-                   "[^[(\"]*" pixel-c-types-regex "[ \t]+[^[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\].*{\n?"
-                   "\\(\\([ \t/\*;#%]*\\([0-9\\.]+\\|[0-9]+\\),?[ \t]*\n?\\)+\\).*"
-                   "};")))))
+(defun pixel-mapx (x f xs)
+  (when (< x 1)
+    (setq x 1))
+  (let ((steps (ceiling (/ (float (length xs)) (float x)))))
+    (loop for n from 0 below steps
+          collect (apply f (subseq xs (* n x) (+ (* n x) x))))))
+
+;; (pixel-mapx 3 (lambda (&rest args) (print args)) '(1 2 3 4 5 6 7 8 9 10))
+
+(defun pixel-normalize-color (type color)
+  (if (string-equal type "int")
+      (list (/ (float (nth 0 color)) (float 255))
+            (/ (float (nth 1 color)) (float 255))
+            (/ (float (nth 2 color)) (float 255)))
+    color))
+ 
+;; (pixel-normalize-color "int" '(255 0 0))
 
 (defun pixel-read-pic-at-point (&optional point)
   (interactive)
   (save-excursion
     (when point
       (goto-char point))
-    (when (thing-at-point-looking-at (pixel-pic-regex :mm major-mode))
+    (when (thing-at-point-looking-at (pixel-regex :pic t :mm major-mode))
       (let* ((id (match-string-no-properties 1))
-             (palette-id (match-string-no-properties 2))
+             (palette-id (or (match-string-no-properties 2) id))
              (type (match-string-no-properties 3))
              (w (read (match-string-no-properties 4)))
              (h (read (match-string-no-properties 5)))
-             (xs (read (concat "(" (replace-regexp-in-string "\n\\|;\\|," " " (match-string-no-properties 6)) ")")))
-             (d (- (length xs) (* w h)))
-             (bitmap (apply 'vector (append xs (make-list d 0)))))
+             (c (read (or (match-string-no-properties 6) "1")))
+             (xs (read (concat "(" (replace-regexp-in-string "\n\\|;\\|," " " (match-string-no-properties 7)) ")")))
+             (d (- (length xs) (* w h c)))
+             (palette (when (string-equal id palette-id) (plist-get (plist-get (pixel-read-palette-at-point) :palette) :colors)))
+             (bitmap (apply 'vector (pixel-mapx c (lambda (&rest color)
+                                                    (cond ((eq (length color) 3)
+                                                           (position (apply 'color-rgb-to-hex (pixel-normalize-color type color))
+                                                                     palette :test 'equal))
+                                                          (t (car color))))
+                                                (append xs (make-list d 0))))))
         (list :pic (list :id id
                          :palette-id palette-id
                          :type type
@@ -251,21 +289,22 @@
   (save-excursion
     (when point
       (goto-char point))
-    (when (thing-at-point-looking-at (pixel-palette-regex :mm major-mode))
+    (when (thing-at-point-looking-at (pixel-regex :mm major-mode))
       (let* ((id (match-string-no-properties 1))
-             (type (match-string-no-properties 2))
-             (size (read (match-string-no-properties 3)))
-             (components (read (match-string-no-properties 4)))
-             (xs (read (concat "(" (replace-regexp-in-string "\n\\|;\\|," " " (match-string-no-properties 5)) ")")))
-             (colors (let ((colors)) (dotimes (i size colors)
-                                       (let ((r (nth (+ (* i components) 0) xs))
-                                             (g (nth (+ (* i components) 1) xs))
-                                             (b (nth (+ (* i components) 2) xs)))
-                                         (when (string-equal type "int")
-                                           (setq r (float (/ r 255))
-                                                 g (float (/ g 255))
-                                                 b (float (/ b 255))))
-                                         (setq colors (append colors (list (color-rgb-to-hex r g b)))))))))
+             (palette-id (match-string-no-properties 2))
+             (type (match-string-no-properties 3))
+             (w (read (match-string-no-properties 4)))
+             (h (read (match-string-no-properties 5)))
+             (c (or (read (or (match-string-no-properties 6) "nil")) w))
+             (xs (read (concat "(" (replace-regexp-in-string "\n\\|;\\|," " " (match-string-no-properties 7)) ")")))
+             (colors (let ((colors)) (progn
+                                       (dotimes (i (* h w) colors)
+                                         (let ((r (nth (+ (* i c) 0) xs))
+                                               (g (nth (+ (* i c) 1) xs))
+                                               (b (nth (+ (* i c) 2) xs)))
+                                           (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t)
+                                           ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
+                                           ))))))
         (list :palette (list :id id
                              :type type
                              :colors colors)
@@ -323,39 +362,25 @@
 ;; (pixel-concurrent-list-buffer)
 ;; (pixel-list-buffer)
 
-(defun* pixel-list-buffer (&key (with-palette nil) (with-pic nil))
-  (pixel-cached (lambda (&rest args)
-                  (unless (or with-palette with-pic)
-                    (setq with-palette t
-                          with-pic t))
-                  (let ((mm major-mode)
-                        (result '()))
-                    (loop for buf in (buffer-list)
-                          do (with-current-buffer buf
+(defun* pixel-list-buffer ()
+  (let ((mm major-mode)
+        (result '()))
+    (loop for buf in (buffer-list)
+          do (pixel-cached (lambda (&rest args)
+                             (with-current-buffer buf
                                (when (and (not buffer-read-only)
                                           (buffer-file-name (current-buffer))
                                           ;; (not (eq major-mode 'org-mode))
                                           ;; (or (eq major-mode 'c-mode)
                                           ;;     (eq major-mode 'emacs-lisp-mode))
-                                          (or (when with-palette
-                                                (save-excursion
-                                                  (goto-char (point-min))
-                                                  (let ((case-fold-search nil))
-                                                    (re-search-forward (pixel-palette-regex :mm major-mode :quick t) nil t))))
-                                              (when with-pic
-                                                (save-excursion
-                                                  (goto-char (point-min))
-                                                  (let ((case-fold-search nil))
-                                                    (re-search-forward (pixel-pic-regex :mm major-mode :quick t) nil t))))))
+                                          (save-excursion
+                                            (goto-char (point-min))
+                                            (let ((case-fold-search nil))
+                                              (re-search-forward (pixel-regex :mm major-mode :quick t) nil t))))
                                  (add-to-list 'result buf))))
-                    result))
-                'pixel-buffer-cache
-                :id (cond ((and with-palette with-pic)
-                           "with-palette-and-pic")
-                          (with-palette
-                           "with-palette")
-                          (with-pic
-                           "with-pic"))))
+                           'pixel-buffer-cache
+                           :id (buffer-name buf)))
+    result))
 
 (defun* pixel-find-palette (&key (id nil) (pic nil) (point nil) (origin nil) (find-origin nil))
   (cond ((numberp point)
@@ -367,19 +392,19 @@
          (save-excursion
            (goto-char (point-min))
            (let ((case-fold-search nil))
-             (if (re-search-forward (pixel-palette-regex :mm major-mode :id id) nil t)
+             (if (re-search-forward (pixel-regex :palette id :mm major-mode :id id) nil t)
                  (plist-get (pixel-read-palette-at-point) (if find-origin :palette-origin :palette))
-               (let ((buffers (pixel-list-buffer :with-palette t))
+               (let ((buffers (pixel-list-buffer))
                      (result nil))
                  (while (and buffers
                              (not (with-current-buffer (pop buffers)
                                     (save-excursion
                                       (goto-char (point-min))
-                                      (when (re-search-forward (pixel-palette-regex :mm major-mode :id id) nil t)
+                                      (when (re-search-forward (pixel-regex :palette id :mm major-mode :id id) nil t)
                                         (setq result (plist-get (pixel-read-palette-at-point) (if find-origin :palette-origin :palette)))))))))
                  result)))))))
 
-;;(pixel-find-palette :pic (pixel-find-pic :id "test1"))
+;; (pixel-find-palette :pic (pixel-find-pic :id "test1"))
 
 (defun* pixel-find-pic (&key (id nil) (point nil) (origin nil) (find-origin nil))
   (cond ((numberp point)
@@ -390,21 +415,17 @@
          (save-excursion
            (goto-char (point-min))
            (let ((case-fold-search nil))
-             (if (re-search-forward (pixel-pic-regex :mm major-mode :id id) nil t)
+             (if (re-search-forward (pixel-regex :pic t :mm major-mode :id id) nil t)
                  (plist-get (pixel-read-pic-at-point) (if find-origin :pic-origin :pic))
-               (let ((buffers (pixel-list-buffer :with-pic t))
+               (let ((buffers (pixel-list-buffer))
                      (result nil))
                  (while (and buffers
                              (not (with-current-buffer (pop buffers)
                                     (save-excursion
                                       (goto-char (point-min))
-                                      (when (re-search-forward (pixel-pic-regex :mm major-mode :id id) nil t)
+                                      (when (re-search-forward (pixel-regex :pic t :mm major-mode :id id) nil t)
                                         (setq result (plist-get (pixel-read-pic-at-point) (if find-origin :pic-origin :pic)))))))))
                  result)))))))
-
-(defun pixel-canvas-pic-set (canvas x y color))
-
-(defun pixel-canvas-pic-ref (canvas x y))
 
 (defun pixel-canvas-find-free-point (ov)
   (let* ((start (overlay-start ov))
@@ -470,7 +491,8 @@
                                       :height rowheight))
              (avg (pixel-palette-average palette))
              (inhibit-point-motion-hooks t)
-             (disable-point-adjustment t))
+             (disable-point-adjustment t)
+             (id (plist-get canvas :id)))
         (goto-char p)
         (when (<= (- (point) (point-at-bol)) 0)
           (insert (propertize " "
@@ -484,8 +506,9 @@
                                 'intangible 'canvas
                                 'pixel-occupied t
                                 'pixel-palette t
-                                'line-height t
-                                'line-spacing nil))
+                                ;;'line-height t
+                                ;;'line-spacing nil
+                                ))
             (insert (propertize " "
                                 'intangible 'canvas
                                 'display whitespace
@@ -497,14 +520,16 @@
                                     :height rowheight))
                  (hover-face (pixel-make-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
             (insert (propertize (if (string-equal c (car (last colors)))
-                                    (propertize "+"  'intangible 'canvas)
-                                  (propertize "+"))
+                                    (propertize " " 'intangible 'canvas) ;; 
+                                  (propertize " "))
                                 'display icon
                                 'pixel-occupied t
                                 'pixel-palette t
-                                'mouse-face hover-face))))))))
+                                'mouse-face hover-face
+                                ;;'follow-link (pixel-make-palette-action 'mouse1 id c)
+                                'keymap (pixel-make-palette-keymap id c)))))))))
 
-(setq pixel-pixel-cache (make-hash-table :test 'equal))
+(defvar pixel-pixel-cache (make-hash-table :test 'equal))
 
 (defun pixel-make-pixel (type zoomlevel color)
   (let ((key (format "%s-%d-%s" (prin1-to-string type) zoomlevel (replace-regexp-in-string "#" "" color))))
@@ -516,21 +541,6 @@
                                                              :color-symbols (pixel-xpm-colors (pixel-palette color))
                                                              :height (* zoomlevel 2)))))
                                    pixel-pixel-cache))))))
-
-(defun pixel-make-keymap (type action)
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<RET>") action)
-    (define-key map (kbd "<SPC>") action)
-    map))
-
-(defun pixel-pic-action (input id &optional x y pos)
-  (print (format "%s %s %d %d" (prin1-to-string input) id x y)))
-
-(defun pixel-make-action (type input id &optional x y)
-  (cond ((eq type 'pic)
-         (eval `(lambda (&optional pos)
-                  (interactive)
-                  (pixel-pic-action (quote ,input) ,id ,x ,y pos))))))
 
 (defun pixel-canvas-insert-pic (canvas palette pic)
   (when (and canvas palette pic)
@@ -558,7 +568,7 @@
           (insert (propertize " "
                               'intangible 'canvas
                               'display whitespace
-                              'pixel-occupied nil
+                              'pixel-occupied t
                               'pixel-pic t))
           (dotimes (x w)
             (let* ((v (pixel-ref pic x y))
@@ -566,24 +576,27 @@
                    (pixel (pixel-make-pixel 'xpm zoomlevel c))
                    (hover-face (pixel-make-face "pixel-mode-pic-hover-face" (color-complement-hex avg) nil x y)))
               (insert (propertize (if (eq x (- w 1))
-                                      (propertize "." 'intangible 'canvas)
-                                    (propertize "."))
+                                      (propertize " " 'intangible 'canvas) 
+                                    (propertize " "))
                                   'display pixel
-                                  'pixel-occupied nil
+                                  'pixel-occupied t
                                   'pixel-value v
                                   'pixel-color c
                                   'pixel-pic t
+                                  'pixel-x x
+                                  'pixel-y y
                                   'line-height t
                                   'line-spacing nil
                                   'mouse-face hover-face
-                                  'follow-link (pixel-make-action 'pic 'mouse1 id x y)
-                                  'keymap (pixel-make-keymap 'pic (pixel-make-action 'pic 'keymap id x y))))))
+                                  ;;'follow-link (pixel-make-pic-action 'mouse1 id x y)
+                                  'keymap (pixel-make-pic-keymap id x y)))))
           (insert (propertize "\n"
                               'intangible 'canvas
-                              'pixel-occupied nil
+                              'pixel-occupied t
                               'pixel-pic t
                               'line-height t
-                              'line-spacing nil)))))))
+                              'line-spacing nil
+                              )))))))
 
 ;; (setq pixel-canvas-overlays
 ;;       '(:ov-complete :ov-source :ov-canvas :ov-seperator1 :ov-tools :ov-seperator2 :ov-palette :ov-seperator3 :ov-pic))
@@ -591,7 +604,7 @@
 ;; (setq pixel-canvas-overlays
 ;;       '(:ov-complete :ov-source :ov-canvas :ov-seperator2 :ov-palette :ov-seperator3 :ov-pic))
 
-(setq pixel-canvas-overlays
+(defvar pixel-canvas-overlays
       '(:ov-complete :ov-canvas :ov-seperator2 :ov-palette :ov-seperator3 :ov-pic))
 
 (defun pixel-canvas-remove (canvas)
@@ -609,45 +622,6 @@
 ;;                      :background "#2f2f2f"
 ;;                      :foreground "#ffffff"
 ;;                      :source-background "#222222")
-
-;; pic: test1
-;; using: bnw
-;; static int pixels[6*7] = {
-;; 0, 0, 0, 0, 0, 0,
-;; 0, 0, 1, 1, 0, 0,
-;; 0, 1, 0, 0, 1, 0,
-;; 0, 1, 1, 1, 1, 0,
-;; 0, 1, 0, 0, 1, 0,
-;; 0, 1, 0, 0, 1, 0,
-;; 0, 0, 0, 0, 0, 0
-;; };
-
-
-;; pic: test2
-;; using: bnw
-(list :id "test2"
-      :palette-id "bnw"
-      :w 6
-      :h 7
-      :pixels [ 0 0 0 0 0 0
-                0 0 1 1 0 0
-                0 1 0 0 1 0
-                0 1 1 1 1 0
-                0 1 0 0 1 0
-                0 1 0 0 1 0
-                0 0 0 0 0 0 ])
-
-;; pic: test2
-;; static int pixels[2*7*3] = {
-;; 0, 0, 0, 0, 0, 0,
-;; 0, 0, 255, 255, 0, 0,
-;; 0, 255, 0, 0, 255, 0,
-;; 0, 255, 255, 255, 255, 0,
-;; 0, 255, 0, 0, 255, 0,
-;; 0, 255, 0, 0, 255, 0,
-;; 0, 0, 0, 0, 0, 0
-;; };
-
 
 (defun* pixel-canvas-create (palette pic origin &key (background nil) (foreground nil) (source-background nil))
   (when (and palette pic origin)
@@ -684,7 +658,7 @@
                            :zoomlevel 12
                            :indentation 20
                            :palette-rowlength 8
-                           :palette-rowheight 20))
+                           :palette-rowheight 24))
              (last-pos (if (overlayp ov-source) src-end first-pos))
              (next-pos last-pos)
              (inhibit-point-motion-hooks t)
@@ -698,8 +672,9 @@
                                        (insert (propertize "\n"
                                                            'intangible 'canvas
                                                            'pixel-overlay key
-                                                           'line-height t
-                                                           'line-spacing nil))
+                                                           ;;'line-height t
+                                                           ;;'line-spacing nil
+                                                           ))
                                        (point-at-bol)))
                  (setq ov-canvas (make-overlay last-pos next-pos))
                  (overlay-put ov-canvas 'face `((:background ,background)
@@ -720,8 +695,9 @@
                                        (insert (propertize "\n"
                                                            'intangible 'canvas
                                                            'pixel-overlay key
-                                                           'line-height t
-                                                           'line-spacing nil))
+                                                           ;;'line-height t
+                                                           ;;'line-spacing nil
+                                                           ))
                                        (point-at-bol)))
                  (let ((ov (make-overlay last-pos next-pos)))
                    (overlay-put ov 'face `((:background ,background)
@@ -746,14 +722,14 @@
             ovs))))
 
 (defun* pixel-list-canvas (&key (buffer nil))
-  (let ((buffers (if buffer `(,buffer) (pixel-list-buffer :with-pic t)))
+  (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))
         (result '()))
     (loop for buf in buffers
           do (with-current-buffer buf
                (save-excursion
                  (goto-char (point-min))
                  (let ((case-fold-search nil))
-                   (while (re-search-forward (pixel-pic-regex :mm major-mode :quick t) nil t)
+                   (while (re-search-forward (pixel-regex :pic t :mm major-mode :quick t) nil t)
                      (let ((overlays (overlays-at (point))))
                        (dolist (ov overlays)
                          (let ((canvas (overlay-get ov 'pixel-canvas)))
@@ -762,14 +738,14 @@
     result))
 
 (defun* pixel-list-pic (&key (buffer nil) (list-origin nil))
-  (let ((buffers (if buffer `(,buffer) (pixel-list-buffer :with-pic t)))
+  (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))
         (result '()))
     (loop for buf in buffers
           do (with-current-buffer buf
                (save-excursion
                  (goto-char (point-min))
                  (let ((case-fold-search nil))
-                   (while (re-search-forward (pixel-pic-regex :mm major-mode) nil t)
+                   (while (re-search-forward (pixel-regex :pic t :mm major-mode) nil t)
                      (let ((id (match-string 1)))
                        (add-to-list 'result (if list-origin
                                                 (plist-get (pixel-read-pic-at-point) :pic-origin)
@@ -839,11 +815,11 @@
         (pixel-canvas-insert-palette canvas palette)
         (set-buffer-modified-p modified-state)))))
 
-(setq pixel-restore-canvas-after-save-list '())
+(defvar pixel-restore-canvas-after-save-list '())
 
-(setq pixel-global-pic-cache (make-hash-table :test 'equal))
-(setq pixel-global-palette-cache (make-hash-table :test 'equal))
-(setq pixel-global-buffer-cache (make-hash-table :test 'equal))
+(defvar pixel-global-pic-cache (make-hash-table :test 'equal))
+(defvar pixel-global-palette-cache (make-hash-table :test 'equal))
+(defvar pixel-global-buffer-cache (make-hash-table :test 'equal))
 
 (defun pixel-before-save ()
   (let ((pixel-pic-cache pixel-global-pic-cache)
@@ -909,7 +885,7 @@
             map)
   (if (not pixel-mode)
       (progn
-        (mapcar 'pixel-canvas-remove (pixel-list-canvas :buffer (current-buffer)))
+        (mapc 'pixel-canvas-remove (pixel-list-canvas :buffer (current-buffer)))
         (remove-hook 'before-save-hook 'pixel-before-save)
         (remove-hook 'after-save-hook 'pixel-after-save))
     (let ((pixel-pic-cache (make-hash-table :test 'equal))
