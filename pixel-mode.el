@@ -2,7 +2,7 @@
 (require 'cl)
 (require 'color)
 
-(require 'pixel-editor)
+(require 'pixel-editor nil 'noerror)
 
 (defvar pixel-types-regex "\\(int\\|float\\)?")
 
@@ -247,20 +247,6 @@
                                       (when (re-search-forward (pixel-regex :bitmap t :mm major-mode :id id) nil t)
                                         (setq result (plist-get (pixel-read-bitmap-at-point) (if find-origin :bitmap-origin :bitmap)))))))))
                  result)))))))
-
-(defun pixel-match-replace (replacements)
-  (save-excursion
-    (let ((ovs (mapcar (lambda (r)
-                         `(,(make-overlay (match-beginning (car r)) (match-end (car r))) . ,(cdr r)))
-                       replacements)))
-      (mapc (lambda (ov)
-              (let ((o (car ov))
-                    (s (cdr ov)))
-                (kill-region (overlay-start o) (overlay-end o))
-                (goto-char (overlay-start o))
-                (insert s)
-                (delete-overlay o)))
-            ovs))))
 
 (defun* pixel-list-editor (&key (buffer nil))
   (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))

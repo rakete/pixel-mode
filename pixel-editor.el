@@ -1,27 +1,35 @@
-(require 'pixel-palette)
-(require 'pixel-bitmap)
+;; Local variables:
+;; byte-compile-warnings: (not cl-functions)
+;; End:
 
-(defun pixel-editor-find-free-point (ov)
-  (let* ((start (overlay-start ov))
-         (end (overlay-end ov))
-         (p start))
-    (while (and (get-text-property p 'pixel-occupied)
-                (< p end))
-      (setq p (1+ p)))
-    p))
+(require 'pixel-palette nil 'noerror)
+(require 'pixel-bitmap nil 'noerror)
 
 (defun pixel-editor-insert-tools (editor &rest tools))
+
+(defun* pixel-find-index (x xs &key (test'eq))
+  (let ((n 0)
+        (found nil))
+    (while (and (< n (length xs))
+                (not found))
+      (setq found (funcall test (nth n xs) x))
+      (unless found
+        (setq n (1+ n))))
+    (when found n)))
+
+;; (pixel-find-index "foo" '("bar" "foo") :test 'string-equal)
 
 (defun pixel-editor-insert-palette (editor palette)
   (when (and editor palette)
     (save-excursion
-      (let* ((ov (plist-get editor :ov-palette))
-             (bg (plist-get editor :background))
-             (fg (plist-get editor :foreground))
-             (rowlength (plist-get editor :palette-rowlength))
-             (rowheight (plist-get editor :palette-rowheight))
-             (indentation (plist-get editor :indentation))
-             (p (pixel-editor-find-free-point ov))
+      (let* ((id (pixel-editor-get editor :id))
+             (ov (pixel-editor-get editor :ov-palette))
+             (bg (pixel-editor-get editor :background))
+             (fg (pixel-editor-get editor :foreground))
+             (indentation (pixel-editor-get editor :indentation))
+             (rowlength (pixel-editor-get editor :palette-rowlength))
+             (rowheight (pixel-editor-get editor :palette-rowheight))
+             (p (overlay-start ov))
              (colors (plist-get palette :colors))
              (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight :background 0)))
              (whitespace (pixel-make-icon :type 'xpm
@@ -31,19 +39,20 @@
              (avg (pixel-palette-average palette))
              (inhibit-point-motion-hooks t)
              (disable-point-adjustment t)
-             (id (plist-get editor :id)))
+             (id (plist-get editor :id))
+             (color-map (make-hash-table :test 'equal)))
         (goto-char p)
         (when (<= (- (point) (point-at-bol)) 0)
           (insert (propertize " "
                               'intangible 'editor
                               'display whitespace
-                              'pixel-occupied t
+                              'pixel-occupied id
                               'palette t)))
-        (dolist (c colors)
+        (dotimes (n (length colors))
           (when (and rowlength (>= (- (point) (point-at-bol)) (+ (if indentation 1 0) rowlength)))
             (insert (propertize "\n"
                                 'intangible 'editor
-                                'pixel-occupied t
+                                'pixel-occupied id
                                 'pixel-palette t
                                 ;;'line-height t
                                 ;;'line-spacing nil
@@ -51,37 +60,38 @@
             (insert (propertize " "
                                 'intangible 'editor
                                 'display whitespace
-                                'pixel-occupied t
+                                'pixel-occupied id
                                 'pixel-palette t)))
-          (let* ((icon (pixel-make-icon :type 'xpm
+          (let* ((c (nth n colors))
+                 (icon (pixel-make-icon :type 'xpm
                                         :data template
                                         :color-symbols (pixel-xpm-colors (pixel-make-palette c fg))
                                         :height rowheight))
                  (hover-face (pixel-make-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
+            (puthash c n color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
                                     (propertize " " 'intangible 'editor) ;; 
                                   (propertize " "))
                                 'display icon
-                                'pixel-occupied t
+                                'pixel-occupied id
+                                'pixel-color c
+                                'pixel-color-id n
                                 'pixel-palette t
                                 'mouse-face hover-face
-                                ;;'follow-link (pixel-make-palette-action 'mouse1 id c)
-                                'keymap (pixel-make-palette-keymap id c)))))))))
+                                'keymap (pixel-editor-palette-keymap editor c)))))
+        (overlay-put ov 'pixel-color-map color-map)))))
 
 (defun pixel-editor-insert-canvas (editor palette bitmap)
   (when (and editor palette bitmap)
     (save-excursion
-      (let* ((ov (plist-get editor :ov-canvas))
-             (bg (plist-get editor :background))
-             (zoomlevel (plist-get editor :zoomlevel))
-             (indentation (plist-get editor :indentation))
-             (w (plist-get bitmap :w))
-             (h (plist-get bitmap :h))
-             (p (pixel-editor-find-free-point ov))
-             ;;(template (pixel-xpm-data (pixel-make-bitmap :w (* zoomlevel 2) :h (* zoomlevel 2) :background 0)))
-             (pixel-cache (make-hash-table :test 'equal :size (* w h)))
+      (let* ((id (pixel-editor-get editor :id))
+             (ov (pixel-editor-get editor :ov-canvas))
+             (bg (pixel-editor-get editor :background))
+             (zoomlevel (pixel-editor-get editor :zoomlevel))
+             (indentation (pixel-editor-get editor :indentation))
              (w (plist-get bitmap :width))
              (h (plist-get bitmap :height))
+             (p (overlay-start ov))
              (colors (apply 'vector (plist-get palette :colors)))
              (avg (pixel-palette-average palette))
              (whitespace (pixel-make-icon :type 'xpm
@@ -96,7 +106,7 @@
           (insert (propertize " "
                               'intangible 'editor
                               'display whitespace
-                              'pixel-occupied t
+                              'pixel-occupied id
                               'pixel-canvas t))
           (dotimes (x w)
             (let* ((v (pixel-bitmap-ref bitmap x y))
@@ -107,21 +117,17 @@
                                       (propertize " " 'intangible 'editor) 
                                     (propertize " "))
                                   'display pixel
-                                  'pixel-occupied t
-                                  'pixel-value v
-                                  'pixel-color c
+                                  'pixel-occupied id
                                   'pixel-canvas t
-                                  'pixel-x x
-                                  'pixel-y y
+                                  'pixel-color c
                                   'line-height t
                                   'line-spacing nil
                                   'mouse-face hover-face
-                                  ;;'follow-link (pixel-make-bitmap-action 'mouse1 id x y)
-                                  'keymap (pixel-make-canvas-keymap id x y)))))
+                                  'keymap (pixel-editor-canvas-keymap editor x y)))))
           (insert (propertize "\n"
                               'intangible 'editor
-                              'pixel-occupied t
-                              'pixel-bitmap t
+                              'pixel-occupied id
+                              'pixel-canvas t
                               'line-height t
                               'line-spacing nil
                               )))))))
@@ -163,7 +169,7 @@
 ;;       '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-canvas))
 
 (defvar pixel-editor-overlays
-  '(:ov-complete :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-canvas))
+  '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-canvas))
 
 (defun pixel-editor-remove (editor)
   (let ((modified-state (buffer-modified-p)))
@@ -171,9 +177,11 @@
       (when (eq key :ov-editor)
         (delete-region (overlay-start (plist-get editor key))
                        (overlay-end (plist-get editor key))))
-      (delete-overlay (plist-get editor key)))
+      (when (plist-get editor key)
+        (delete-overlay (plist-get editor key))))
     (unless (find :ov-source pixel-editor-overlays)
       (delete-overlay (plist-get editor :ov-source)))
+    (pixel-editor-put editor nil) 
     (set-buffer-modified-p modified-state)))
 
 ;; (pixel-editor-create (pixel-find-palette :id "bnw") (pixel-find-bitmap :id "test1") (pixel-find-bitmap :find-origin t :id "test1")
@@ -193,7 +201,7 @@
       (let* ((first-pos (progn (goto-char (plist-get origin :beginning))
                                (point-at-bol)))
              (src-end (progn (goto-char (plist-get origin :end))
-                             (next-line)
+                             (forward-line)
                              (point-at-bol)))
              ;; when :ov-source is not in pixel-editor-overlays, we create a overlay here and hide the text
              (ov-source (unless (find :ov-source pixel-editor-overlays)
@@ -208,19 +216,23 @@
                          (let ((str (buffer-substring first-pos src-end)))
                            (delete-region first-pos src-end)
                            str)))
-             (editor (list :id (plist-get bitmap :id)
-                           :palette-id (plist-get bitmap :palette-id)
-                           :ov-source ov-source
-                           :background background
-                           :foreground foreground
-                           :zoomlevel 12
-                           :indentation 20
-                           :palette-rowlength 8
-                           :palette-rowheight 24))
+             (id (plist-get bitmap :id))
+             (palette-id (plist-get bitmap :palette-id))
+             (editor (list :id id
+                           :palette-id palette-id
+                           :ov-source ov-source))
              (last-pos (if (overlayp ov-source) src-end first-pos))
              (next-pos last-pos)
              (inhibit-point-motion-hooks t)
              (disable-point-adjustment t))
+        (pixel-editor-put editor :background background)
+        (pixel-editor-put editor :foreground foreground)
+        (pixel-editor-put editor :zoomlevel 12)
+        (pixel-editor-put editor :indentation 20)
+        (pixel-editor-put editor :palette-rowlength 32)
+        (pixel-editor-put editor :palette-rowheight 24)
+        (pixel-editor-put editor :bitmap-height (plist-get bitmap :height))
+        (pixel-editor-put editor :bitmap-width (plist-get bitmap :width))
         (dolist (key pixel-editor-overlays)
           (cond ((eq :ov-complete key)
                  (setq ov-complete (make-overlay first-pos (+ last-pos 1)))
@@ -241,8 +253,7 @@
                 ((eq :ov-source key)
                  (setq next-pos (progn (goto-char last-pos)
                                        (insert src-text)
-                                       (point-at-bol))
-                       bg source-background)
+                                       (point-at-bol)))
                  (setq ov-source (make-overlay last-pos next-pos))
                  (overlay-put ov-source 'face `((:background ,source-background)
                                                 (:foreground ,foreground)))
@@ -265,26 +276,108 @@
         (overlay-put ov-complete
                      'pixel-editor editor)))))
 
-(defun pixel-canvas-action (input id &optional x y pos)
-  (print (format "%s %s %d %d" (prin1-to-string input) id x y))
+(defun pixel-image-put-color (image prop val)
+  `(image ,(plist-put (cdr image) prop val)))
+
+(defun pixel-canvas-point (editor x y)
+  (let ((w (pixel-editor-get editor :bitmap-width))
+        (h (pixel-editor-get editor :bitmap-height))
+        (ov (pixel-editor-get editor :ov-canvas)))
+    (+ (overlay-start ov) 1 (* y 2) (* y w) x)))
+
+(defun pixel-match-replace (replacements)
+  (save-excursion
+    (let ((ovs (mapcar (lambda (r)
+                         `(,(make-overlay (match-beginning (car r)) (match-end (car r))) . ,(cdr r)))
+                       replacements)))
+      (mapc (lambda (ov)
+              (let ((o (car ov))
+                    (s (cdr ov)))
+                (kill-region (overlay-start o) (overlay-end o))
+                (goto-char (overlay-start o))
+                (insert s)
+                (delete-overlay o)))
+            ovs))))
+
+;; (replace-match)
+
+(defun pixel-palette-color-id (editor color)
+  (let ((ov-palette (pixel-editor-get editor :ov-palette)))
+    (gethash color (overlay-get ov-palette 'pixel-color-map))))
+
+(defun pixel-source-replace (editor x y color)
+  (let* ((xs (if (listp x) x (list x)))
+         (ys (if (listp y) y (list y)))
+         (colors (if (listp color) color (make-list (length xs) color)))
+         (pixels (mapcar* #'list xs ys colors))
+         (ov-source (pixel-editor-get editor :ov-source))
+         (bitmap (plist-get (pixel-read-bitmap-at-point (overlay-start ov-source)) :bitmap))
+         (w (plist-get bitmap :width))
+         (h (plist-get bitmap :height))
+         (type (plist-get bitmap :type))
+         (comma (plist-get bitmap :comma))
+         (new-source ""))
+    (dotimes (x w)
+      (dotimes (y h)
+        (setq new-source (concat new-source (pixel-bitmap-ref bitmap x y)))))))
+
+;; [ 0, 1, 2,
+;;   3, 4, 5,
+;;   6, 7, 8 ]
+
+
+;; (let ((foo ""))
+;;   (dotimes (y 2 foo)
+;;     (setq foo (concat foo (mapconcat 'prin1-to-string (print (butlast (nthcdr (* 4 (print 1)) '(0 1 2 3 4 5 6 7)) 4)) ", ")))))
+
+;; (let ((xs '(0 1 2 3 4 5 6 7))
+;;       (w 4)
+;;       (x 0))
+;;   (loop for n from 0 below (length xs)
+;;         do (setq x (1+ x))
+;;         collect (concat (prin1-to-string (nth n xs))
+;;                         (cond ((eq x w)
+;;                                (progn
+;;                                  (setq x 0)
+;;                                  ",<eof>"))
+;;                               ((eq n (1- (length xs)))
+;;                                "<eof>")
+;;                               (t
+;;                                ", ")))))
+
+;; (mapcar 'prin1-to-string '(0 1 2 3 4 5 6 7))
+
+;;(pixel-source-replace nil '(1 2 3) '(4 5 8 9 10) '(6 7))
+
+(defun pixel-canvas-draw (editor x y zoomlevel color)
+  (put-text-property (pixel-canvas-point editor x y)
+                     (1+ (pixel-canvas-point editor x y))
+                     'display
+                     (pixel-make-pixel 'xpm zoomlevel color)))
+
+(defun pixel-canvas-action (input editor &optional x y)
+  (pixel-canvas-draw editor x y
+                     (pixel-editor-get editor :zoomlevel)
+                     (pixel-editor-get editor :foreground))
+  (print (pixel-palette-color-id editor (pixel-editor-get editor :foreground)))
   nil)
 
-(defun pixel-make-canvas-action (input id &optional x y)
+(defun pixel-make-canvas-action (input editor &optional x y)
   (eval `(lambda (&optional pos)
            (interactive)
-           (pixel-canvas-action (quote ,input) ,id ,x ,y pos))))
+           (pixel-canvas-action (quote ,input) (quote ,editor) ,x ,y))))
 
-(defun pixel-make-canvas-keymap (id &optional x y)
+(defun pixel-editor-canvas-keymap (editor &optional x y)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
-    (define-key map (kbd "<RET>") (pixel-make-canvas-action 'keyboard id x y))
-    (define-key map (kbd "<SPC>") (pixel-make-canvas-action 'keyboard id x y))
-    (define-key map (kbd "<double-mouse-1>") (pixel-make-canvas-action 'mouse1 id x y))
-    (define-key map (kbd "<double-mouse-2>") (pixel-make-canvas-action 'mouse2 id x y))
-    (define-key map (kbd "<double-mouse-3>") (pixel-make-canvas-action 'mouse3 id x y))
-    (define-key map (kbd "<down-mouse-1>") (pixel-make-canvas-action 'mouse1 id x y))
-    (define-key map (kbd "<down-mouse-2>") (pixel-make-canvas-action 'mouse2 id x y))
-    (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-action 'mouse3 id x y))
+    (define-key map (kbd "<RET>") (pixel-make-canvas-action 'keyboard editor x y))
+    (define-key map (kbd "<SPC>") (pixel-make-canvas-action 'keyboard editor x y))
+    (define-key map (kbd "<double-mouse-1>") (pixel-make-canvas-action 'mouse1 editor x y))
+    (define-key map (kbd "<double-mouse-2>") (pixel-make-canvas-action 'mouse2 editor x y))
+    (define-key map (kbd "<double-mouse-3>") (pixel-make-canvas-action 'mouse3 editor x y))
+    (define-key map (kbd "<down-mouse-1>") (pixel-make-canvas-action 'mouse1 editor x y))
+    (define-key map (kbd "<down-mouse-2>") (pixel-make-canvas-action 'mouse2 editor x y))
+    (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-action 'mouse3 editor x y))
     (define-key map (kbd "<drag-mouse-1>") 'pixel-canvas-drag)
     (define-key map (kbd "<drag-mouse-2>") 'pixel-canvas-drag)
     (define-key map (kbd "<drag-mouse-3>") 'pixel-canvas-drag)
@@ -303,23 +396,23 @@
 ;;                  (memq (car-safe event) '(switch-frame select-window))))
 ;;       (mouse-set-point event))))
 
-(defun pixel-palette-action (input id &optional color pos)
-  (print (format "%s %s %s" (prin1-to-string input) id color))
+(defun pixel-palette-action (input editor &optional color)
+  (pixel-editor-put editor :foreground color)
   nil)
 
-(defun pixel-make-palette-action (input id &optional color)
+(defun pixel-make-palette-action (input editor &optional color)
   (eval `(lambda (&optional pos)
            (interactive)
-           (pixel-palette-action (quote ,input) ,id ,color pos))))
+           (pixel-palette-action (quote ,input) (quote ,editor) ,color))))
 
-(defun pixel-make-palette-keymap (id &optional color)
+(defun pixel-editor-palette-keymap (editor &optional color)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
-    (define-key map (kbd "<RET>") (pixel-make-palette-action 'keyboard id color))
-    (define-key map (kbd "<SPC>") (pixel-make-palette-action 'keyboard id color))
-    (define-key map (kbd "<down-mouse-1>") (pixel-make-palette-action 'mouse1 id color))
-    (define-key map (kbd "<down-mouse-2>") (pixel-make-palette-action 'mouse2 id color))
-    (define-key map (kbd "<down-mouse-3>") (pixel-make-palette-action 'mouse3 id color))
+    (define-key map (kbd "<RET>") (pixel-make-palette-action 'keyboard editor color))
+    (define-key map (kbd "<SPC>") (pixel-make-palette-action 'keyboard editor color))
+    (define-key map (kbd "<down-mouse-1>") (pixel-make-palette-action 'mouse1 editor color))
+    (define-key map (kbd "<down-mouse-2>") (pixel-make-palette-action 'mouse2 editor color))
+    (define-key map (kbd "<down-mouse-3>") (pixel-make-palette-action 'mouse3 editor color))
     (define-key map (kbd "<drag-mouse-1>") 'pixel-palette-drag)
     (define-key map (kbd "<drag-mouse-2>") 'pixel-palette-drag)
     (define-key map (kbd "<drag-mouse-3>") 'pixel-palette-drag)
