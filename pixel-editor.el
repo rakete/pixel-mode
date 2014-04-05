@@ -23,9 +23,9 @@
              (indentation (plist-get editor :indentation))
              (p (pixel-editor-find-free-point ov))
              (colors (plist-get palette :colors))
-             (template (pixel-xpm-data (pixel-make-bitmap :w rowheight :h rowheight :background 0)))
+             (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight :background 0)))
              (whitespace (pixel-make-icon :type 'xpm
-                                          :data (pixel-xpm-data (pixel-make-bitmap :w indentation :h rowheight :background 0))
+                                          :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height rowheight :background 0))
                                           :color-symbols (pixel-xpm-colors (pixel-make-palette bg bg))
                                           :height rowheight))
              (avg (pixel-palette-average palette))
@@ -80,10 +80,12 @@
              (p (pixel-editor-find-free-point ov))
              ;;(template (pixel-xpm-data (pixel-make-bitmap :w (* zoomlevel 2) :h (* zoomlevel 2) :background 0)))
              (pixel-cache (make-hash-table :test 'equal :size (* w h)))
+             (w (plist-get bitmap :width))
+             (h (plist-get bitmap :height))
              (colors (apply 'vector (plist-get palette :colors)))
              (avg (pixel-palette-average palette))
              (whitespace (pixel-make-icon :type 'xpm
-                                          :data (pixel-xpm-data (pixel-make-bitmap :w indentation :h (* zoomlevel 2) :background 0))
+                                          :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height (* zoomlevel 2) :background 0))
                                           :color-symbols (pixel-xpm-colors (pixel-make-palette bg))
                                           :height (* zoomlevel 2)))
              (id (plist-get bitmap :id))
@@ -147,7 +149,7 @@
   (let ((key (format "%s-%d-%s" (prin1-to-string type) zoomlevel (replace-regexp-in-string "#" "" color))))
     (cons 'image (cdr (or (gethash key pixel-pixel-cache nil)
                           (puthash key (cond ((eq type 'xpm)
-                                              (let ((template (pixel-xpm-data (pixel-make-bitmap :w (* zoomlevel 2) :h (* zoomlevel 2) :background 0))))
+                                              (let ((template (pixel-xpm-data (pixel-make-bitmap :width (* zoomlevel 2) :height (* zoomlevel 2) :background 0))))
                                                 (pixel-make-icon :type 'xpm
                                                                  :data template
                                                                  :color-symbols (pixel-xpm-colors (pixel-make-palette color))
