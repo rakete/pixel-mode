@@ -329,4 +329,30 @@
   (interactive "e")
   (print event))
 
+(defvar pixel-editor-state (make-hash-table :test 'equal))
+
+(defun pixel-editor-put (editor prop &optional val)
+  (or (and (plist-get editor prop)
+           (plist-put editor prop val))
+      (let* ((key (plist-get editor :id)))
+        (when key
+          (if prop
+              (puthash key (plist-put (or (gethash key pixel-editor-state)
+                                          (puthash key '() pixel-editor-state)) prop val)
+                       pixel-editor-state)
+            (puthash key val pixel-editor-state))
+          editor))))
+
+;; (pixel-editor-put (list :id "aaa" :foo "lala") :ficken "bar")
+
+(defun pixel-editor-get (editor &optional prop default)
+  (or (plist-get editor prop)
+      (let* ((key (plist-get editor :id)))
+        (when key
+          (or (unless prop (gethash key pixel-editor-state))
+              (plist-get (or (gethash key pixel-editor-state)
+                             (puthash key '() pixel-editor-state)) prop))))
+      default))
+
+;; (pixel-editor-get (list :id "aaa" :foo "lala") :ficken)
 (provide 'pixel-editor)
