@@ -16,26 +16,28 @@
          (init (cond ((or (stringp palette) (and palette bitmap)) "\\(?:\\<palette\\>\\|\\<bitmap\\>\\)")
                      (palette "\\<palette\\>")
                      (bitmap "\\<bitmap\\>")))
-         (using-optional (and (or (not (stringp palette))
-                                  (string-equal palette id))
-                              "?"))
+         (palette-optional (and (or (not (stringp palette))
+                                    (string-equal palette id))
+                                "?"))
          (id (if id
                  (regexp-quote id)
                "[^ \t\n]+"))
          (quick-re (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
                            ;; comment   palette/bitmap   1:specific or any name
-                           "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" using-optional
+                           "\\(?:[ \t/\*;#%]*palette:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
                            ;; comment, 2:specific or any palette name when init=bitmap, whole thing may be optional
                            ;; a bitmap without a using param can be itself a palette, when it has colors packed in (rgb triples)
+                           "\\(?:[ \t/\*;#%]*format:[ \t]*\\(" "[^ \t\n]+" "\\)" "[ \t\n]+" "\\)?"
+                           ;; 3:format of the image (rgba or rgb, defaults to rgb)
                            ))
          (full-re (unless quick
                     (concat
                      "\\(?:" "[^\[\(\{\"]*" pixel-types-regex "[ \t]+[^\[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\]" "\\)?"
-                     ;; search for 3:types, if any, then search for c-style array indicator, getting 4:width, 5:height and optionally 6:number of components
+                     ;; search for 4:types, if any, then search for c-style array indicator, getting 5:width, 6:height and optionally 7:number of components
                      "\\(?:.*\n\\)*?.*\\(\\[\\|\(\\|\{\\)" "[ \t\n]*?"
-                     ;; 7:open
+                     ;; 8:open
                      "\\(\\(?:[ \t/\*;#%]*\\(?:[0-9\\.]+\\|[0-9]+\\)\\(?:[ \t,]*\\)?\n?\\)+\\)"
-                     ;; 8:array
+                     ;; 9:array
                      ))))
     (concat quick-re full-re)))
 
@@ -83,35 +85,59 @@
       (goto-char point))
     (when (thing-at-point-looking-at (pixel-regex :bitmap t :mm major-mode))
       (let* ((id (print (match-string-no-properties 1)))
-             (palette-id (or (print (match-string-no-properties 2)) id))
-             (source (print (match-string-no-properties 8)))
-             (comma (pixel-find-comma source))
-             (w (or (read (or (print (match-string-no-properties 4)) "nil"))
-                    (print (pixel-find-width source comma))))
-             (h (or (read (or (print (match-string-no-properties 5)) "nil"))
-                    (print (pixel-find-height source))))
-             (c (read (or (print (match-string-no-properties 6)) "1")))
-             (open (print (match-string-no-properties 7)))
-             (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " source)) ")")))
-             (type (or (print (match-string-no-properties 3))
+             (palette-id (or (match-string-no-properties 2) id))
+             (format (or (match-string-no-properties 3) "nil"))
+             (array (print (match-string-no-properties 9)))
+             (comma (print (pixel-find-comma array)))
+             (stride (print (let ((c (or (read (or (match-string-no-properties 7) "nil"))
+                                         (cond ((string-equal format "rgba")
+                                                4)
+                                               ((string-equal format "rgb")
+                                                3)
+                                               ((not (string-equal palette-id id))
+                                                1)
+                                               (t
+                                                (pixel-find-stride array comma))))))
+                              (cond ((and (eq c 4) (string-equal format "nil"))
+                                     (progn (setq format "rgba") c))
+                                    ((and (eq c 3) (string-equal format "nil"))
+                                     (progn (setq format "rgb") c))
+                                    ((and (eq c 1) (string-equal format "nil"))
+                                     (progn (setq format "palette") c))
+                                    (t c)))))
+             (w (print (or (read (or (match-string-no-properties 5) "nil"))
+                           (/ (pixel-find-width array comma) stride))))
+             (h (print (or (read (or (match-string-no-properties 6) "nil"))
+                           (pixel-find-height array))))
+             (open (print (match-string-no-properties 8)))
+             (numbers (print (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")"))))
+             (type (or (print (match-string-no-properties 4))
                        (pixel-find-type numbers)))
-             (d (- (length numbers) (* w h c)))
+             (d (- (print (length numbers)) (* w h stride)))
              (palette (when (string-equal id palette-id) (plist-get (plist-get (pixel-read-palette-at-point) :palette) :colors)))
-             (array (apply 'vector (pixel-mapx c (lambda (&rest color)
+             (alpha (make-vector (* w h) 1))
+             (array (apply 'vector (pixel-mapx stride (lambda (n &rest color)
                                                    (cond ((eq (length color) 3)
                                                           (position (apply 'color-rgb-to-hex (pixel-normalize-color type color))
                                                                     palette :test 'equal))
+                                                         ((eq (length color) 4)
+                                                          (progn
+                                                            (setf (elt alpha n) (nth 3 color))
+                                                            (position (apply 'color-rgb-to-hex (butlast (pixel-normalize-color type color) 1))
+                                                                      palette :test 'equal)))
                                                          (t (car color))))
                                                (append numbers (make-list d 0))))))
         (list :bitmap (list :id id
                             :palette-id palette-id
+                            :format format
                             :type type
                             :width w
                             :height h
-                            :c c
+                            :stride stride
                             :open open
                             :comma comma
                             :array array
+                            :alpha alpha
                             :close (cond ((string-equal open "(")
                                           ")")
                                          ((string-equal open "[")
@@ -121,6 +147,8 @@
               :bitmap-origin (list :id id
                                    :beginning (match-beginning 0)
                                    :end (match-end 0)
+                                   :array-beginning (match-beginning 8)
+                                   :array-end (match-end 8)
                                    :buffer (current-buffer)))))))
 
 (defun pixel-find-stride (source &optional comma)
@@ -140,27 +168,43 @@
     (when (thing-at-point-looking-at (pixel-regex :mm major-mode))
       (let* ((id (match-string-no-properties 1))
              (palette-id (match-string-no-properties 2))
-             (source (print (match-string-no-properties 8)))
-             (comma (pixel-find-comma source))
-             (c (or (read (or (match-string-no-properties 6) "nil"))
-                    (pixel-find-stride source comma)))
-             (w (or (read (or (match-string-no-properties 4) "nil"))
-                    (/ (pixel-find-width source comma) c)))
-             (h (or (read (or (match-string-no-properties 5) "nil"))
-                    (pixel-find-height source)))
-             (open (print (match-string-no-properties 7)))
-             (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " (match-string-no-properties 8))) ")")))
-             (type (or (match-string-no-properties 3)
+             (format (or (match-string-no-properties 3) "nil"))
+             (array (match-string-no-properties 9))
+             (comma (pixel-find-comma array))
+             (stride (print (let ((c (or (read (or (match-string-no-properties 7) "nil"))
+                                         (cond ((string-equal format "rgba")
+                                                4)
+                                               ((string-equal format "rgb")
+                                                3)
+                                               ((not (string-equal palette-id id))
+                                                1)
+                                               (t
+                                                (pixel-find-stride array comma))))))
+                              (cond ((and (eq c 4) (string-equal format "nil"))
+                                     (progn (setq format "rgba") c))
+                                    ((and (eq c 3) (string-equal format "nil"))
+                                     (progn (setq format "rgb") c))
+                                    ((and (eq c 1) (string-equal format "nil"))
+                                     (progn (setq format "palette") c))
+                                    (t c)))))
+             (w (or (read (or (match-string-no-properties 5) "nil"))
+                    (/ (pixel-find-width array comma) stride)))
+             (h (or (read (or (match-string-no-properties 6) "nil"))
+                    (pixel-find-height array)))
+             (open (print (match-string-no-properties 8)))
+             (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")")))
+             (type (or (match-string-no-properties 4)
                        (pixel-find-type numbers)))
              (colors (let ((colors)) (progn
                                        (dotimes (i (* h w) colors)
-                                         (let ((r (nth (+ (* i c) 0) numbers))
-                                               (g (nth (+ (* i c) 1) numbers))
-                                               (b (nth (+ (* i c) 2) numbers)))
+                                         (let ((r (nth (+ (* i stride) 0) numbers))
+                                               (g (nth (+ (* i stride) 1) numbers))
+                                               (b (nth (+ (* i stride) 2) numbers)))
                                            (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t)
                                            ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
                                            ))))))
         (list :palette (list :id id
+                             :format format
                              :type type
                              :open open
                              :comma comma
@@ -174,6 +218,8 @@
               :palette-origin (list :id
                                     :beginning (match-beginning 0)
                                     :end (match-end 0)
+                                    :array-beginning (match-beginning 8)
+                                    :array-end (match-end 8)
                                     :buffer (current-buffer)))))))
 
 (defun pixel-origin-p (origin)
