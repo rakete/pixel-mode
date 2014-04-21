@@ -379,7 +379,7 @@
     (when (not editor)
       (let* ((bitmap (pixel-cached 'pixel-find-bitmap 'pixel-bitmap-cache :origin origin))
              (palette (pixel-cached 'pixel-find-palette 'pixel-palette-cache :bitmap bitmap))
-             (editor (pixel-editor-create palette bitmap origin
+             (editor (pixel-editor-create bitmap origin
                                           :background "#2f2f2f"
                                           :foreground "#ffffff"
                                           :source-background "#222222")))
