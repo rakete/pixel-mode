@@ -30,15 +30,49 @@
     (apply 'color-rgb-to-hex (list (/ ra size) (/ ga size) (/ ba size)))))
 
 ;;(pixel-palette-average (pixel-find-palette :id "bnw"))
+
+;; (defun pixel-bitmap-index (bitmap x y &optional c)
+;;   (let ((s (plist-get bitmap :stride)))
+;;     (+ (+ (* y (plist-get bitmap :width)) (* x s)) (or c 0))))
+
+;; (defun pixel-bitmap-ref (bitmap x y &optional c)
+;;   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y c)))
+
 (defun pixel-bitmap-index (bitmap x y)
   (+ (* y (plist-get bitmap :width)) x))
 
 (defun pixel-bitmap-ref (bitmap x y)
   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y)))
 
+;; (defun pixel-bitmap-color (bitmap x y palette)
+;;   (let ((format (plist-get bitmap :format))
+;;         (colors (plist-get palette :colors)))
+;;     (cond ((string-equal format "palette")
+;;            (elt colors (pixel-bitmap-ref bitmap x y)))
+;;           ((or (string-equal format "rgb") (string-equal format "rgba"))
+;;            (apply 'color-rgb-to-hex (loop for c from 0 below 3 collect (pixel-bitmap-ref bitmap x y c)))))))
+
+;; (defun pixel-bitmap-set (bitmap x y value)
+;;   (let ((value (if (listp value value (list value))))
+;;         (n (car (sort (list (length value) (plist-get bitmap :stride)) #'<))))
+;;     (dotimes (c n)
+;;       (aset (plist-get bitmap :array) (pixel-bitmap-index bitmap x y c) (nth c value))))
+;;   bitmap)
+
 (defun pixel-bitmap-set (bitmap x y value)
   (aset (plist-get bitmap :array) (pixel-bitmap-index bitmap x y) value)
   bitmap)
+
+;; (defun pixel-bitmap-mapc (f bitmap)
+;;   (let ((w (plist-get bitmap :width))
+;;         (h (plist-get bitmap :height))
+;;         (s (plist-get bitmap :stride)))
+;;     (loop for x from 0 below w
+;;           do (loop for y from 0 below h
+;;                    do (if (> s 1)
+;;                           (apply f `(,x ,y ,(pixel-bitmap-ref bitmap x y)))
+;;                         (apply f `(,x ,y ,(loop for c from 0 below s
+;;                                                 collect (pixel-bitmap-ref bitmap x y s)))))))))
 
 (defun pixel-bitmap-mapc (f bitmap)
   (let ((w (cdr (plist-get bitmap :width)))
