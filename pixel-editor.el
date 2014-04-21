@@ -189,8 +189,8 @@
 ;;                      :foreground "#ffffff"
 ;;                      :source-background "#222222")
 
-(defun* pixel-editor-create (palette bitmap origin &key (background nil) (foreground nil) (source-background nil))
-  (when (and palette bitmap origin)
+(defun* pixel-editor-create (bitmap origin &key (background nil) (foreground nil) (source-background nil))
+  (when (and bitmap origin)
     (unless background
       (setq background (face-attribute 'default :background)))
     (unless foreground
@@ -237,10 +237,17 @@
         (pixel-editor-put editor :foreground foreground)
         (pixel-editor-put editor :zoomlevel 12)
         (pixel-editor-put editor :indentation 20)
+        (pixel-editor-put editor :palette-id (plist-get bitmap :palette-id))
         (pixel-editor-put editor :palette-rowlength 32)
         (pixel-editor-put editor :palette-rowheight 24)
+        (pixel-editor-put editor :bitmap-id (plist-get bitmap :id))
+        (pixel-editor-put editor :bitmap-type (plist-get bitmap :type))
+        (pixel-editor-put editor :bitmap-comma (plist-get bitmap :comma))
+        (pixel-editor-put editor :bitmap-open (plist-get bitmap :open))
+        (pixel-editor-put editor :bitmap-close (plist-get bitmap :close))
         (pixel-editor-put editor :bitmap-height (plist-get bitmap :height))
         (pixel-editor-put editor :bitmap-width (plist-get bitmap :width))
+        (pixel-editor-put editor :bitmap-stride (plist-get bitmap :stride))
         (dolist (key pixel-editor-overlays)
           (cond ((eq :ov-complete key)
                  (setq ov-complete (make-overlay first-pos (+ last-pos 1)))
