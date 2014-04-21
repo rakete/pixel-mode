@@ -180,6 +180,7 @@
         (delete-overlay (plist-get editor key))))
     (unless (find :ov-source pixel-editor-overlays)
       (delete-overlay (plist-get editor :ov-source)))
+    (delete-overlay (plist-get editor :ov-array))
     (pixel-editor-put editor nil) 
     (set-buffer-modified-p modified-state)))
 
@@ -202,11 +203,18 @@
              (src-end (progn (goto-char (plist-get origin :end))
                              (forward-line)
                              (point-at-bol)))
+             (array-beg (plist-get origin :array-beginning))
+             (array-beg-offset (- array-beg (plist-get origin :beginning)))
+             (array-end (plist-get origin :array-end))
+             (array-end-offset (- array-end (plist-get origin :beginning)))
+             (ov-array (unless (find :ov-source pixel-editor-overlays)
+                         (let ((ov (make-overlay array-beg array-end)))
+                           (overlay-put ov 'invisible t)
+                           ov)))
              ;; when :ov-source is not in pixel-editor-overlays, we create a overlay here and hide the text
              (ov-source (unless (find :ov-source pixel-editor-overlays)
                           (let ((ov (make-overlay first-pos src-end)))
                             (overlay-put ov 'invisible t)
-                            ;;(overlay-put ov 'face `((:background "#ff0000")))
                             ov)))
              ;; need overlay symbol so we can add the editor as property to it
              (ov-complete nil)
@@ -219,7 +227,8 @@
              (palette-id (plist-get bitmap :palette-id))
              (editor (list :id id
                            :palette-id palette-id
-                           :ov-source ov-source))
+                           :ov-source ov-source
+                           :ov-array ov-array))
              (last-pos (if (overlayp ov-source) src-end first-pos))
              (next-pos last-pos)
              (inhibit-point-motion-hooks t)
@@ -254,9 +263,13 @@
                                        (insert src-text)
                                        (point-at-bol)))
                  (setq ov-source (make-overlay last-pos next-pos))
+                 (setq ov-array (make-overlay (+ last-pos array-beg-offset) (+ last-pos array-end-offset)))
                  (overlay-put ov-source 'face `((:background ,source-background)
                                                 (:foreground ,foreground)))
+                 (overlay-put ov-array 'face `((:background ,source-background)
+                                               (:foreground ,foreground)))
                  (plist-put editor :ov-source ov-source)
+                 (plist-put editor :ov-array ov-array)
                  (setq last-pos next-pos))
                 (t
                  (setq next-pos (progn (goto-char last-pos)
