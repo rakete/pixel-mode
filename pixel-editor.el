@@ -2,7 +2,6 @@
 ;; byte-compile-warnings: (not cl-functions)
 ;; End:
 
-(require 'pixel-palette nil 'noerror)
 (require 'pixel-bitmap nil 'noerror)
 
 (defun pixel-editor-insert-tools (editor &rest tools))
