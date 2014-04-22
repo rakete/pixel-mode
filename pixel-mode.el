@@ -337,7 +337,8 @@
                    ((stringp id)
                     (let ((origin (pixel-find-bitmap :find-origin t :id id)))
                       (when (pixel-origin-p origin)
-                        (overlays-at (plist-get origin :beginning)))))
+                        (with-current-buffer (plist-get origin :buffer)
+                            (overlays-at (plist-get origin :beginning))))))
                    (t
                     (overlays-at (point)))))
         (editor nil))
