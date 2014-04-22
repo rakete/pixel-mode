@@ -46,7 +46,7 @@
     (setq x 1))
   (let ((steps (ceiling (/ (float (length xs)) (float x)))))
     (loop for n from 0 below steps
-          collect (apply f (subseq xs (* n x) (+ (* n x) x))))))
+          collect (apply f n (subseq xs (* n x) (+ (* n x) x))))))
 
 ;; (pixel-mapx 3 (lambda (&rest args) (print args)) '(1 2 3 4 5 6 7 8 9 10))
 
