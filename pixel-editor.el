@@ -295,41 +295,33 @@
         (overlay-put ov-complete
                      'pixel-editor editor)))))
 
-(defun pixel-image-put-color (image prop val)
-  `(image ,(plist-put (cdr image) prop val)))
-
 (defun pixel-canvas-point (editor x y)
   (let ((w (pixel-editor-get editor :bitmap-width))
         (h (pixel-editor-get editor :bitmap-height))
         (ov (pixel-editor-get editor :ov-canvas)))
     (+ (overlay-start ov) 1 (* y 2) (* y w) x)))
 
-(defun pixel-match-replace (replacements)
-  (save-excursion
-    (let ((ovs (mapcar (lambda (r)
-                         `(,(make-overlay (match-beginning (car r)) (match-end (car r))) . ,(cdr r)))
-                       replacements)))
-      (mapc (lambda (ov)
-              (let ((o (car ov))
-                    (s (cdr ov)))
-                (kill-region (overlay-start o) (overlay-end o))
-                (goto-char (overlay-start o))
-                (insert s)
-                (delete-overlay o)))
-            ovs))))
+(defun pixel-source-color (editor color)
+  (cond ((string-equal (pixel-editor-get editor :bitmap-format) "palette")
+         (let ((ov-palette (pixel-editor-get editor :ov-palette)))
+           (gethash color (overlay-get ov-palette 'pixel-color-map))))
+        ((or (string-equal (pixel-editor-get editor :bitmap-format) "rgb")
+             (string-equal (pixel-editor-get editor :bitmap-format) "rgba"))
+         (let* ((comma (pixel-editor-get editor :bitmap-comma))
+                (type (pixel-editor-get editor :bitmap-type)))
+           (mapconcat (lambda (c)
+                        (prin1-to-string (cond ((string-equal type "float")
+                                                c)
+                                               ((string-equal type "int")
+                                                (truncate (* c 255))))))
+                      (color-name-to-rgb color)
+                      comma)))))
 
-;; (replace-match)
-
-(defun pixel-palette-color-id (editor color)
-  (let ((ov-palette (pixel-editor-get editor :ov-palette)))
-    (gethash color (overlay-get ov-palette 'pixel-color-map))))
-
-;; [ 0, 1, 2,
-;;   3, 4, 5,
-;;   6, 7, 8 ]
-(defun pixel-source-replace (editor x y color)
+(defun pixel-source-replace-pixel (editor x y color)
   (let* ((width (pixel-editor-get editor :bitmap-width))
          (height (pixel-editor-get editor :bitmap-height))
+         (stride (pixel-editor-get editor :bitmap-stride))
+         (comma (pixel-editor-get editor :bitmap-comma))
          (xs (if (listp x) x (list x)))
          (ys (if (listp y) y (list y)))
          (colors (if (listp color) color (make-list (length xs) color)))
@@ -351,52 +343,28 @@
             (when (> (- y lasty) 0)
               (goto-char (point-at-bol))
               (setq lasty (dotimes (yi (- y lasty) (+ lasty yi))
-                            (re-search-forward (concat "[^0-9.]*\\(?:[0-9.]+[^0-9.]*\\)\\{" (prin1-to-string width) "\\}")))
+                            (re-search-forward (concat "\\(^[^0-9.]*\\)?\\(?:[0-9.]+[" (regexp-quote comma) "\n]*\\)\\{" (prin1-to-string (* width stride)) "\\}") (overlay-end ov-array)))
                     lastx 0))
             (setq lastx (dotimes (xi (- x lastx) (+ lastx xi))
-                          (re-search-forward "[0-9.]+")))
+                          (re-search-forward (concat "\\(?:[0-9.]+[" (regexp-quote comma) "\n]*\\)\\{"(prin1-to-string stride) "\\}")  (overlay-end ov-array))))
             (save-excursion
-              (re-search-forward "\\([0-9.]+\\)")
+              (re-search-forward (concat "\\(\\(?:[0-9.]+\\([" (regexp-quote comma) "\n]*\\)\\)\\{" (prin1-to-string stride) "\\}\\)") (overlay-end ov-array))
               ;;(print (match-string-no-properties 1))
-              (replace-match color 1))))))))
+              (replace-match (concat color (match-string 2)) 1))))))))
 
-;; (pixel-source-replace (pixel-find-editor :id "lisp") 0 0 "1")
-;; (pixel-source-replace (pixel-single-editor :id "single") 0 0 "#00ff00")
+;; (pixel-source-replace-pixel (pixel-find-editor :id "lisp") 0 4 "1")
 
-;; (let ((foo ""))
-;;   (dotimes (y 2 foo)
-;;     (setq foo (concat foo (mapconcat 'prin1-to-string (print (butlast (nthcdr (* 4 (print 1)) '(0 1 2 3 4 5 6 7)) 4)) ", ")))))
-
-;; (let ((xs '(0 1 2 3 4 5 6 7))
-;;       (w 4)
-;;       (x 0))
-;;   (loop for n from 0 below (length xs)
-;;         do (setq x (1+ x))
-;;         collect (concat (prin1-to-string (nth n xs))
-;;                         (cond ((eq x w)
-;;                                (progn
-;;                                  (setq x 0)
-;;                                  ",<eof>"))
-;;                               ((eq n (1- (length xs)))
-;;                                "<eof>")
-;;                               (t
-;;                                ", ")))))
-
-;; (mapcar 'prin1-to-string '(0 1 2 3 4 5 6 7))
-
-;;(pixel-source-replace nil '(1 2 3) '(4 5 8 9 10) '(6 7))
-
-(defun pixel-canvas-draw (editor x y zoomlevel color)
-  (put-text-property (pixel-canvas-point editor x y)
-                     (1+ (pixel-canvas-point editor x y))
-                     'display
-                     (pixel-make-pixel 'xpm zoomlevel color)))
-
-(defun pixel-canvas-action (input editor &optional x y)
-  (pixel-canvas-draw editor x y
-                     (pixel-editor-get editor :zoomlevel)
-                     (pixel-editor-get editor :foreground))
-  (print (pixel-palette-color-id editor (pixel-editor-get editor :foreground)))
+;; (let* ((editor (pixel-find-editor :id "single"))
+;;        (comma (pixel-editor-get editor :bitmap-comma))
+;;        (type (pixel-editor-get editor :bitmap-type))
+;;        (color (mapconcat (lambda (c)
+;;                            (prin1-to-string (cond ((string-equal type "float")
+;;                                                    c)
+;;                                                   ((string-equal type "int")
+;;                                                    (truncate (* c 255))))))
+;;                          (color-name-to-rgb "#aaaaaa")
+;;                          comma)))
+;;   (pixel-source-replace-pixel (pixel-find-editor :id "single") 2 2 color))
   nil)
 
 (defun pixel-make-canvas-action (input editor &optional x y)
