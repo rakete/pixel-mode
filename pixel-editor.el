@@ -31,10 +31,11 @@
              (rowheight (pixel-editor-get editor :palette-rowheight))
              (p (overlay-start ov))
              (colors (plist-get palette :colors))
+             (symbols (plist-get palette :symbols))
              (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight :background 0)))
              (whitespace (pixel-make-icon :type 'xpm
                                           :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height rowheight :background 0))
-                                          :color-symbols (pixel-xpm-colors (pixel-make-palette bg bg))
+                                          :color-symbols `(("col0" . ,bg))
                                           :height rowheight))
              (avg (pixel-palette-average palette))
              (inhibit-point-motion-hooks t)
@@ -65,10 +66,10 @@
           (let* ((c (nth n colors))
                  (icon (pixel-make-icon :type 'xpm
                                         :data template
-                                        :color-symbols (pixel-xpm-colors (pixel-make-palette c fg))
+                                        :color-symbols `(("col0" . ,c))
                                         :height rowheight))
                  (hover-face (pixel-make-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
-            (puthash c n color-map)
+            (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
                                     (propertize " " 'intangible 'editor) ;; 
                                   (propertize " "))
@@ -96,7 +97,7 @@
              (avg (pixel-palette-average palette))
              (whitespace (pixel-make-icon :type 'xpm
                                           :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height (* zoomlevel 2) :background 0))
-                                          :color-symbols (pixel-xpm-colors (pixel-make-palette bg))
+                                          :color-symbols `(("col0" . ,bg))
                                           :height (* zoomlevel 2)))
              (id (plist-get bitmap :id))
              (inhibit-point-motion-hooks t)
@@ -161,7 +162,7 @@
                                               (let ((template (pixel-xpm-data (pixel-make-bitmap :width (* zoomlevel 2) :height (* zoomlevel 2) :background 0))))
                                                 (pixel-make-icon :type 'xpm
                                                                  :data template
-                                                                 :color-symbols (pixel-xpm-colors (pixel-make-palette color))
+                                                                 :color-symbols `(("col0"  . ,color))
                                                                  :height (* zoomlevel 2)))))
                                    pixel-pixel-cache))))))
 

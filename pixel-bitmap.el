@@ -1,5 +1,16 @@
-(defun pixel-make-palette (&rest colors)
-  (list :colors colors))
+(defun pixel-make-palette (colors &optional symbols)
+  (unless (listp colors)
+    (setq colors (list colors)))
+  (unless (listp symbols)
+    (setq symbols (list symbols)))
+  (list :colors colors
+        :symbols (or symbols
+                     (loop for i from 0 upto (length colors) collect (prin1-to-string i)))
+        :format "palette"
+        :type "int"
+        :comma " "
+        :open "["
+        :clos "]"))
 
 (defun pixel-normalize-color (type color)
   (let ((ret (if (string-equal type "int")
@@ -89,7 +100,12 @@
           :height height
           :background background
           :foreground foreground
-          :array array)))
+          :array array
+          :format "palette"
+          :comma " "
+          :open "["
+          :close "]"
+          :type "int")))
 
 ;; (let ((foo (pixel-make-bitmap)))
 ;;   (pixel-bitmap-set foo 2 3 2)
