@@ -404,7 +404,21 @@
            (interactive)
            (pixel-canvas-action (quote ,input) (quote ,editor) ,x ,y))))
 
-(defun pixel-editor-canvas-keymap (editor &optional x y)
+(defun pixel-make-canvas-drag (input editor)
+  (eval `(lambda (event)
+           (interactive "e")
+           (when event
+             (let* ((a (nth 5 (nth 1 event)))
+                    (b (nth 5 (nth 2 event)))
+                    (x0 (when a (get-text-property a 'pixel-x)))
+                    (y0 (when a (get-text-property a 'pixel-y)))
+                    (x1 (when b (get-text-property b 'pixel-x)))
+                    (y1 (when b (get-text-property b 'pixel-y))))
+               (when (and x0 y0 x1 y1)
+                 (message "%d %d %d %d" x0 y0 x1 y1)
+                 (pixel-canvas-action (quote ,input) (quote ,editor) x0 y0 x1 y1)))))))
+
+(defun pixel-editor-canvas-keymap (editor x y)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
     (define-key map (kbd "<RET>") (pixel-make-canvas-action 'keyboard editor x y))
@@ -415,14 +429,10 @@
     (define-key map (kbd "<down-mouse-1>") (pixel-make-canvas-action 'mouse1 editor x y))
     (define-key map (kbd "<down-mouse-2>") (pixel-make-canvas-action 'mouse2 editor x y))
     (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-action 'mouse3 editor x y))
-    (define-key map (kbd "<drag-mouse-1>") 'pixel-canvas-drag)
-    (define-key map (kbd "<drag-mouse-2>") 'pixel-canvas-drag)
-    (define-key map (kbd "<drag-mouse-3>") 'pixel-canvas-drag)
+    (define-key map (kbd "<drag-mouse-1>") (pixel-make-canvas-drag 'mouse1 editor))
+    (define-key map (kbd "<drag-mouse-2>") (pixel-make-canvas-drag 'mouse2 editor))
+    (define-key map (kbd "<drag-mouse-3>") (pixel-make-canvas-drag 'mouse3 editor))
     map))
-
-(defun pixel-canvas-drag (event)
-  (interactive "e")
-  (print event))
 
 ;; (mouse-set-point event)
 ;; (let (event)
@@ -442,6 +452,11 @@
            (interactive)
            (pixel-palette-action (quote ,input) (quote ,editor) ,color))))
 
+(defun pixel-make-palette-drag (input editor &optional color)
+  (eval `(lambda (event)
+           (interactive "e")
+           (pixel-palette-action (quote ,input) (quote ,editor) ,color))))
+
 (defun pixel-editor-palette-keymap (editor &optional color)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
@@ -450,14 +465,11 @@
     (define-key map (kbd "<down-mouse-1>") (pixel-make-palette-action 'mouse1 editor color))
     (define-key map (kbd "<down-mouse-2>") (pixel-make-palette-action 'mouse2 editor color))
     (define-key map (kbd "<down-mouse-3>") (pixel-make-palette-action 'mouse3 editor color))
-    (define-key map (kbd "<drag-mouse-1>") 'pixel-palette-drag)
-    (define-key map (kbd "<drag-mouse-2>") 'pixel-palette-drag)
-    (define-key map (kbd "<drag-mouse-3>") 'pixel-palette-drag)
+    (define-key map (kbd "<drag-mouse-1>") (pixel-make-palette-drag 'mouse1 editor color))
+    (define-key map (kbd "<drag-mouse-2>") (pixel-make-palette-drag 'mouse2 editor color))
+    (define-key map (kbd "<drag-mouse-3>") (pixel-make-palette-drag 'mouse3 editor color))
     map))
 
-(defun pixel-palette-drag (event)
-  (interactive "e")
-  (print event))
 
 (defvar pixel-editor-state (make-hash-table :test 'equal))
 
