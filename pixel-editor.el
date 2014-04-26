@@ -4,9 +4,10 @@
 
 (require 'pixel-bitmap nil 'noerror)
 
-(defun pixel-editor-insert-tools (editor &rest tools))
+(defun pixel-editor-insert-tools (editor &rest tools)
+  (pixel-editor-put editor :tool-current 'draw))
 
-(defun* pixel-find-index (x xs &key (test'eq))
+(defun* pixel-find-index (x xs &key (test 'eq))
   (let ((n 0)
         (found nil))
     (while (and (< n (length xs))
@@ -23,9 +24,9 @@
     (save-excursion
       (let* ((id (pixel-editor-get editor :id))
              (ov (pixel-editor-get editor :ov-palette))
-             (bg (pixel-editor-get editor :background))
-             (fg (pixel-editor-get editor :foreground))
-             (indentation (pixel-editor-get editor :indentation))
+             (bg (pixel-editor-get editor :editor-background))
+             (fg (pixel-editor-get editor :editor-foreground))
+             (indentation (pixel-editor-get editor :editor-indentation))
              (rowlength (pixel-editor-get editor :palette-rowlength))
              (rowheight (pixel-editor-get editor :palette-rowheight))
              (p (overlay-start ov))
@@ -85,9 +86,9 @@
     (save-excursion
       (let* ((id (pixel-editor-get editor :id))
              (ov (pixel-editor-get editor :ov-canvas))
-             (bg (pixel-editor-get editor :background))
-             (zoomlevel (pixel-editor-get editor :zoomlevel))
-             (indentation (pixel-editor-get editor :indentation))
+             (bg (pixel-editor-get editor :editor-background))
+             (zoomlevel (pixel-editor-get editor :editor-zoomlevel))
+             (indentation (pixel-editor-get editor :editor-indentation))
              (w (plist-get bitmap :width))
              (h (plist-get bitmap :height))
              (p (overlay-start ov))
@@ -110,6 +111,7 @@
           (dotimes (x w)
             (let* ((v (pixel-bitmap-ref bitmap x y))
                    (c (elt colors v))
+                   ;;(c (pixel-bitmap-color bitmap x y palette))
                    (pixel (pixel-make-pixel 'xpm zoomlevel c))
                    (hover-face (pixel-make-face "pixel-mode-canvas-hover-face" (color-complement-hex avg) nil x y)))
               (insert (propertize (if (eq x (- w 1))
@@ -119,6 +121,8 @@
                                   'pixel-occupied id
                                   'pixel-canvas t
                                   'pixel-color c
+                                  'pixel-x x
+                                  'pixel-y y
                                   'line-height t
                                   'line-spacing nil
                                   'mouse-face hover-face
@@ -233,13 +237,15 @@
              (next-pos last-pos)
              (inhibit-point-motion-hooks t)
              (disable-point-adjustment t))
-        (pixel-editor-put editor :background background)
-        (pixel-editor-put editor :foreground foreground)
-        (pixel-editor-put editor :zoomlevel 12)
-        (pixel-editor-put editor :indentation 20)
+        (pixel-editor-put editor :editor-foreground foreground)
+        (pixel-editor-put editor :editor-background background)
+        (pixel-editor-put editor :editor-zoomlevel 12)
+        (pixel-editor-put editor :editor-indentation 20)
         (pixel-editor-put editor :palette-id (plist-get bitmap :palette-id))
         (pixel-editor-put editor :palette-rowlength 32)
         (pixel-editor-put editor :palette-rowheight 24)
+        (pixel-editor-put editor :palette-background (nth 0 (plist-get palette :colors)))
+        (pixel-editor-put editor :palette-foreground (car (last (plist-get palette :colors))))
         (pixel-editor-put editor :bitmap-id (plist-get bitmap :id))
         (pixel-editor-put editor :bitmap-type (plist-get bitmap :type))
         (pixel-editor-put editor :bitmap-comma (plist-get bitmap :comma))
@@ -248,6 +254,7 @@
         (pixel-editor-put editor :bitmap-height (plist-get bitmap :height))
         (pixel-editor-put editor :bitmap-width (plist-get bitmap :width))
         (pixel-editor-put editor :bitmap-stride (plist-get bitmap :stride))
+        (pixel-editor-put editor :bitmap-format (plist-get bitmap :format))
         (dolist (key pixel-editor-overlays)
           (cond ((eq :ov-complete key)
                  (setq ov-complete (make-overlay first-pos (+ last-pos 1)))
@@ -365,9 +372,31 @@
 ;;                          (color-name-to-rgb "#aaaaaa")
 ;;                          comma)))
 ;;   (pixel-source-replace-pixel (pixel-find-editor :id "single") 2 2 color))
+
+(defun pixel-tool-draw (input editor x0 y0 &optional x1 y1)
+  (list (list x0 y0 (cond ((eq input 'mouse1)
+                           (pixel-editor-get editor :palette-foreground))
+                          ((eq input 'mouse3)
+                           (pixel-editor-get editor :palette-background))))))
+
+(defun pixel-canvas-update (editor updates)
+  (dolist (u updates)
+    (let ((x (nth 0 u))
+          (y (nth 1 u))
+          (color (nth 2 u)))
+      (put-text-property (pixel-canvas-point editor x y)
+                         (1+ (pixel-canvas-point editor x y))
+                         'display
+                         (pixel-make-pixel 'xpm (pixel-editor-get editor :editor-zoomlevel) color))
+      (pixel-source-replace-pixel editor x y (pixel-source-color editor color)))))
+
+(defun pixel-canvas-action (input editor x0 y0 &optional x1 y1)
+  (pixel-canvas-update editor
+                       (cond ((eq (pixel-editor-get editor :tool-current) 'draw)
+                              (pixel-tool-draw input editor x0 y0 x1 x1))))
   nil)
 
-(defun pixel-make-canvas-action (input editor &optional x y)
+(defun pixel-make-canvas-action (input editor x y)
   (eval `(lambda (&optional pos)
            (interactive)
            (pixel-canvas-action (quote ,input) (quote ,editor) ,x ,y))))
@@ -412,7 +441,7 @@
 ;;       (mouse-set-point event))))
 
 (defun pixel-palette-action (input editor &optional color)
-  (pixel-editor-put editor :foreground color)
+  (pixel-editor-put editor :palette-foreground color)
   nil)
 
 (defun pixel-make-palette-action (input editor &optional color)
