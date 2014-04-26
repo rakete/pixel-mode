@@ -147,8 +147,8 @@
               :bitmap-origin (list :id id
                                    :beginning (match-beginning 0)
                                    :end (match-end 0)
-                                   :array-beginning (match-beginning 8)
-                                   :array-end (match-end 8)
+                                   :array-beginning (match-beginning 9)
+                                   :array-end (match-end 9)
                                    :buffer (current-buffer)))))))
 
 (defun pixel-find-stride (source &optional comma)
@@ -218,8 +218,8 @@
               :palette-origin (list :id
                                     :beginning (match-beginning 0)
                                     :end (match-end 0)
-                                    :array-beginning (match-beginning 8)
-                                    :array-end (match-end 8)
+                                    :array-beginning (match-beginning 9)
+                                    :array-end (match-end 9)
                                     :buffer (current-buffer)))))))
 
 (defun pixel-origin-p (origin)
