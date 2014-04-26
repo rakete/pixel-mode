@@ -189,7 +189,7 @@
 ;;                      :foreground "#ffffff"
 ;;                      :source-background "#222222")
 
-(defun* pixel-editor-create (bitmap origin &key (background nil) (foreground nil) (source-background nil))
+(defun* pixel-editor-create (bitmap palette origin &key (background nil) (foreground nil) (source-background nil))
   (when (and bitmap origin)
     (unless background
       (setq background (face-attribute 'default :background)))
