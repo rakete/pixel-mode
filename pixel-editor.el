@@ -33,10 +33,7 @@
              (colors (plist-get palette :colors))
              (symbols (plist-get palette :symbols))
              (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight :background 0)))
-             (whitespace (pixel-make-icon :type 'xpm
-                                          :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height rowheight :background 0))
-                                          :color-symbols `(("col0" . ,bg))
-                                          :height rowheight))
+             (whitespace (pixel-make-pixel bg indentation rowheight))
              (avg (pixel-palette-average palette))
              (inhibit-point-motion-hooks t)
              (disable-point-adjustment t)
@@ -64,10 +61,7 @@
                                 'pixel-occupied id
                                 'pixel-palette t)))
           (let* ((c (nth n colors))
-                 (icon (pixel-make-icon :type 'xpm
-                                        :data template
-                                        :color-symbols `(("col0" . ,c))
-                                        :height rowheight))
+                 (icon (pixel-make-pixel c rowheight))
                  (hover-face (pixel-make-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
             (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
@@ -95,10 +89,7 @@
              (p (overlay-start ov))
              (colors (apply 'vector (plist-get palette :colors)))
              (avg (pixel-palette-average palette))
-             (whitespace (pixel-make-icon :type 'xpm
-                                          :data (pixel-xpm-data (pixel-make-bitmap :width indentation :height (* zoomlevel 2) :background 0))
-                                          :color-symbols `(("col0" . ,bg))
-                                          :height (* zoomlevel 2)))
+             (whitespace (pixel-make-pixel bg indentation (* zoomlevel 2)))
              (id (plist-get bitmap :id))
              (inhibit-point-motion-hooks t)
              (disable-point-adjustment t))
@@ -113,7 +104,7 @@
             (let* ((v (pixel-bitmap-ref bitmap x y))
                    (c (elt colors v))
                    ;;(c (pixel-bitmap-color bitmap x y palette))
-                   (pixel (pixel-make-pixel 'xpm zoomlevel c))
+                   (pixel (pixel-make-pixel c (* zoomlevel 2)))
                    (hover-face (pixel-make-face "pixel-mode-canvas-hover-face" (color-complement-hex avg) nil x y)))
               (insert (propertize (if (eq x (- w 1))
                                       (propertize " " 'intangible 'editor) 
@@ -136,7 +127,7 @@
                               'line-spacing nil
                               )))))))
 
-(defun pixel-make-icon (&rest keys)
+(defun pixel-make-image (&rest keys)
   (find-image (list keys)))
 
 (defun pixel-make-face (id fg &optional hex x y)
@@ -153,17 +144,16 @@
       (set-face-attribute face nil :box (list :line-width 3 :color fg :style nil)))
     face))
 
-(defvar pixel-pixel-cache (make-hash-table :test 'equal))
+(setq pixel-pixel-cache (make-hash-table :test 'equal))
 
-(defun pixel-make-pixel (type zoomlevel color)
-  (let ((key (format "%s-%d-%s" (prin1-to-string type) zoomlevel (replace-regexp-in-string "#" "" color))))
+(defun pixel-make-pixel (color width &optional height)
+  (let ((key (format "xpm-%d*%d-%s" width (or height width) (replace-regexp-in-string "#" "" color))))
     (cons 'image (cdr (or (gethash key pixel-pixel-cache nil)
-                          (puthash key (cond ((eq type 'xpm)
-                                              (let ((template (pixel-xpm-data (pixel-make-bitmap :width (* zoomlevel 2) :height (* zoomlevel 2) :background 0))))
-                                                (pixel-make-icon :type 'xpm
-                                                                 :data template
-                                                                 :color-symbols `(("col0"  . ,color))
-                                                                 :height (* zoomlevel 2)))))
+                          (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width) :background 0))))
+                                         (pixel-make-image :type 'xpm
+                                                           :data template
+                                                           :color-symbols `(("col0"  . ,color))
+                                                           :height (or height width)))
                                    pixel-pixel-cache))))))
 
 ;; (setq pixel-editor-overlays
@@ -384,11 +374,12 @@
   (dolist (u updates)
     (let ((x (nth 0 u))
           (y (nth 1 u))
-          (color (nth 2 u)))
+          (color (nth 2 u))
+          (zoomlevel (pixel-editor-get editor :editor-zoomlevel)))
       (put-text-property (pixel-canvas-point editor x y)
                          (1+ (pixel-canvas-point editor x y))
                          'display
-                         (pixel-make-pixel 'xpm (pixel-editor-get editor :editor-zoomlevel) color))
+                         (pixel-make-pixel color (* zoomlevel 2)))
       (pixel-source-replace-pixel editor x y (pixel-source-color editor color)))))
 
 (defun pixel-canvas-action (input editor x0 y0 &optional x1 y1)
