@@ -387,7 +387,7 @@
                                           :background "#2f2f2f"
                                           :foreground "#ffffff"
                                           :source-background "#222222")))
-        (pixel-editor-insert-tools editor 'pixel 'fill)
+        (pixel-editor-insert-toolbar editor 'pixel 'fill)
         (pixel-editor-insert-canvas editor palette bitmap)
         (pixel-editor-insert-palette editor palette)
         (set-buffer-modified-p modified-state)))))

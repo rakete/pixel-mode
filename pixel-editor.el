@@ -4,7 +4,7 @@
 
 (require 'pixel-bitmap nil 'noerror)
 
-(defun pixel-editor-insert-tools (editor &rest tools)
+(defun pixel-editor-insert-toolbar (editor &rest tools)
   (pixel-editor-put editor :tool-current 'draw))
 
 (defun* pixel-find-index (x xs &key (test 'eq))
