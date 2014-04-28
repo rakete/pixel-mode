@@ -357,6 +357,108 @@
               ;;(print (match-string-no-properties 1))
               (replace-match (concat color (match-string 2)) 1))))))))
 
+(defun pixel-editor-buffer (editor)
+  (overlay-buffer (pixel-editor-get editor :ov-complete)))
+
+(defun pixel-source-row (editor color &optional append)
+  (with-current-buffer (pixel-editor-buffer editor)
+    (save-excursion
+      )))
+
+(defun pixel-canvas-row (editor color &optional append)
+  (with-current-buffer (pixel-editor-buffer editor)
+    (save-excursion
+      (let* ((id (pixel-editor-get editor :id))
+             (w (pixel-editor-get editor :bitmap-width))
+             (h (pixel-editor-get editor :bitmap-height))
+             (p (if append
+                    (1+ (pixel-canvas-point editor (- w 1) (- h 1)))
+                  (goto-char (pixel-canvas-point editor 0 0))
+                  (point-at-bol)))
+             (rowy (if append h 0))
+             (bg (pixel-editor-get editor :editor-background))
+             (zoomlevel (pixel-editor-get editor :editor-zoomlevel))
+             (indentation (pixel-editor-get editor :editor-indentation))
+             (whitespace (pixel-make-pixel bg indentation (* zoomlevel 2)))
+             (old-hover-face (get-text-property (pixel-canvas-point editor 0 0) 'mouse-face))
+             (inhibit-point-motion-hooks t)
+             (disable-point-adjustment t))
+        (goto-char p)
+        (when append
+          (insert (propertize "\n"
+                              'intangible 'editor
+                              'pixel-occupied id
+                              'pixel-canvas t
+                              'line-height t
+                              'line-spacing nil)))
+        (insert (propertize " "
+                            'intangible 'editor
+                            'display whitespace
+                            'pixel-occupied id
+                            'pixel-canvas t))
+        (dotimes (x w)
+          (let* ((pixel (pixel-make-pixel color (* zoomlevel 2)))
+                 (hover-face (pixel-copy-hover-face old-hover-face nil x rowy)))
+            (insert (propertize (if (eq x (- w 1))
+                                    (propertize " " 'intangible 'editor) 
+                                  (propertize " "))
+                                'display pixel
+                                'pixel-occupied id
+                                'pixel-canvas t
+                                'pixel-color color
+                                'pixel-x x
+                                'pixel-y rowy
+                                'line-height t
+                                'line-spacing nil
+                                'mouse-face hover-face
+                                'keymap (pixel-editor-canvas-keymap editor x rowy)))))
+        (unless append
+          (insert (propertize "\n"
+                              'intangible 'editor
+                              'pixel-occupied id
+                              'pixel-canvas t
+                              'line-height t
+                              'line-spacing nil))
+          (let ((x w)
+                (y h))
+            (pixel-map-text-properties (overlay-start (pixel-editor-get editor :ov-canvas))
+                                       (overlay-end (pixel-editor-get editor :ov-canvas))
+                                       (list 'pixel-x 'pixel-y 'keymap)
+                                       (lambda (pos plist)
+                                         (setq plist (plist-put plist 'pixel-x
+                                                                (setq x (if (< (1+ x) w) (1+ x) 0))))
+                                         (if (= x 0)
+                                             (setq plist (plist-put plist 'pixel-y
+                                                                    (setq y (if (< (1+ y) (1+ h)) (1+ y) 0))))
+                                           (setq plist (plist-put plist 'pixel-y y)))
+                                         (setq plist (plist-put plist 'keymap
+                                                                (pixel-editor-canvas-keymap editor x y)))
+                                         (setq plist (plist-put plist 'pixel-color color))
+                                         (setq plist (plist-put plist 'mouse-face
+                                                                (pixel-copy-hover-face old-hover-face nil x y)))
+                                         plist))))
+        (pixel-editor-put editor :bitmap-height (1+ h))))))
+
+(defun pixel-map-text-properties (start end props f &optional buffer)
+  (with-current-buffer (or buffer (current-buffer))
+    (save-excursion
+      (goto-char start)
+      (while (< (point) end)
+        (forward-char)
+        (let ((plist '()))
+          (dolist (prop props)
+            (setq plist (plist-put plist prop (get-text-property (point) prop))))
+          (when (every #'identity plist)
+            (setq plist (funcall f (point) plist))
+            (add-text-properties (point) (1+ (point)) plist)))))))
+
+;; (let ((ov (pixel-editor-get (pixel-find-editor :id "lisp") :ov-canvas)))
+;;   (pixel-map-text-properties (overlay-start ov) (overlay-end ov)
+;;                              (list 'pixel-x 'pixel-y)
+;;                              (lambda (pos plist)
+;;                                (print plist))
+;;                              (overlay-buffer ov)))
+
 ;; (pixel-source-replace-pixel (pixel-find-editor :id "lisp") 0 4 "1")
 
 ;; (let* ((editor (pixel-find-editor :id "single"))
