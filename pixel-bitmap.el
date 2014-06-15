@@ -55,6 +55,9 @@
 (defun pixel-bitmap-ref (bitmap x y)
   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y)))
 
+(defun pixel-bitmap-alpha-ref (bitmap x y)
+  (aref (plist-get bitmap :alpha) (pixel-bitmap-index bitmap x y)))
+
 ;; (defun pixel-bitmap-color (bitmap x y palette)
 ;;   (let ((format (plist-get bitmap :format))
 ;;         (colors (plist-get palette :colors)))
@@ -94,7 +97,7 @@
 
 ;; (pixel-bitmap-mapc (lambda (x y v) (print `(,x ,y ,v))) (pixel-make-bitmap :width 2 :h 2))
 
-(defun* pixel-make-bitmap (&key (width 16) (height 16) (background -1) (foreground -1))
+(defun* pixel-make-bitmap (&key (width 16) (height 16) (background 0) (foreground 1))
   (let* ((array (make-vector (* width height) background)))
     (list :width width
           :height height
@@ -106,6 +109,9 @@
           :open "["
           :close "]"
           :type "int")))
+
+(defun* pixel-copy-bitmap (bitmap &rest keys)
+  )
 
 ;; (let ((foo (pixel-make-bitmap)))
 ;;   (pixel-bitmap-set foo 2 3 2)
@@ -145,6 +151,26 @@
     (append bitmap (list :alpha array))))
 
 ;; (pixel-bitmap-alpha (pixel-make-bitmap :background 0) :color 0)
+
+(defun pixel-bitmap-resize (bitmap w h color)
+  (let* ((width (plist-get bitmap :width))
+         (height (plist-get bitmap :height))
+         (new-width (+ width w))
+         (new-height (+ height h))
+         (old-array (plist-get bitmap :array))
+         (new-array (make-vector (* new-width new-height) color)))
+    (dotimes (y new-width)
+      (dotimes (x new-height)
+        (when (and (< x width) (< y height))
+          (aset new-array
+                (pixel-bitmap-index (pixel-make-bitmap :width new-width
+                                                       :height new-height
+                                                       :background color)
+                                    x y)
+                (pixel-bitmap-ref bitmap x y)))))
+    (plist-put bitmap :array new-array)))
+
+;; (print (pixel-bitmap-resize (pixel-make-bitmap :width 4 :height 4) 0 0 1))
 
 (defun pixel-bitmap-p (bitmap)
   (when (and (listp bitmap)

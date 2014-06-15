@@ -388,15 +388,15 @@
                                           :foreground "#ffffff"
                                           :source-background "#222222")))
         (pixel-editor-insert-toolbar editor 'pixel 'fill)
-        (pixel-editor-insert-canvas editor palette bitmap)
+        (pixel-editor-insert-canvas editor bitmap)
         (pixel-editor-insert-palette editor palette)
         (set-buffer-modified-p modified-state)))))
 
 (defvar pixel-restore-editor-after-save-list '())
 
-(defvar pixel-global-bitmap-cache (make-hash-table :test 'equal))
-(defvar pixel-global-palette-cache (make-hash-table :test 'equal))
-(defvar pixel-global-buffer-cache (make-hash-table :test 'equal))
+(setq pixel-global-bitmap-cache (make-hash-table :test 'equal))
+(setq pixel-global-palette-cache (make-hash-table :test 'equal))
+(setq pixel-global-buffer-cache (make-hash-table :test 'equal))
 
 (defun pixel-before-save ()
   (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
@@ -454,7 +454,7 @@
 ;; (ad-activate 'save-buffer)
 
 (define-minor-mode pixel-mode
-  "Create pixel art right inside your programming buffers."
+  "Create pixel art right inside your programming buffers"
   :lighter " Pixel"
   :global nil
   :keymap (let ((map (make-sparse-keymap)))
