@@ -4,7 +4,7 @@
 
 (require 'pixel-editor nil 'noerror)
 
-(defvar pixel-types-regex "\\(int\\|float\\)?")
+(setq pixel-types-regex "\\(int\\|float\\)")
 
 (defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (mm nil) (quick nil))
   (unless mm
@@ -32,7 +32,7 @@
                            ))
          (full-re (unless quick
                     (concat
-                     "\\(?:" "[^\[\(\{\"]*" pixel-types-regex "[ \t]+[^\[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\]" "\\)?"
+                     "\\(?:" "\\(?:[^\[\(\{\"]*" pixel-types-regex "[ \t]+\\)?[^\[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\]" "\\)?"
                      ;; search for 4:types, if any, then search for c-style array indicator, getting 5:width, 6:height and optionally 7:number of components
                      "\\(?:.*\n\\)*?.*\\(\\[\\|\(\\|\{\\)" "[ \t\n]*?"
                      ;; 8:open
@@ -460,6 +460,7 @@
   :keymap (let ((map (make-sparse-keymap)))
             ;;(define-key map (kbd "C-c C-c") 'pixel)
             map)
+  (buffer-disable-undo)
   (if (not pixel-mode)
       (progn
         (mapc 'pixel-editor-remove (pixel-list-editor :buffer (current-buffer)))
@@ -471,4 +472,7 @@
       (add-hook 'before-save-hook 'pixel-before-save)
       (add-hook 'after-save-hook 'pixel-after-save)
       (dolist (origin (pixel-list-bitmap :buffer (current-buffer) :list-origin t))
-        (pixel-toggle-editor :origin origin)))))
+        (pixel-toggle-editor :origin origin))))
+  (buffer-enable-undo))
+
+(provide 'pixel-mode)
