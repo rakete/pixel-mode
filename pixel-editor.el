@@ -158,7 +158,7 @@
                  (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
             (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
-                                    (propertize " " 'intangible 'editor) ;; 
+                                    (propertize " " 'intangible 'editor) ;;
                                   (propertize " "))
                                 'display icon
                                 'pixel-occupied id
@@ -203,7 +203,7 @@
                    (pixel (pixel-make-pixel c (* zoomlevel 2)))
                    (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face" (color-complement-hex avg) nil x y)))
               (insert (propertize (if (eq x (- w 1))
-                                      (propertize " " 'intangible 'editor) 
+                                      (propertize " " 'intangible 'editor)
                                     (propertize " "))
                                   'display pixel
                                   'pixel-occupied id
@@ -244,7 +244,7 @@
     (unless (find :ov-source pixel-editor-overlays)
       (delete-overlay (plist-get editor :ov-source)))
     (delete-overlay (plist-get editor :ov-array))
-    (pixel-editor-put editor nil) 
+    (pixel-editor-put editor nil)
     (set-buffer-modified-p modified-state)))
 
 ;; (pixel-editor-create (pixel-find-palette :id "bnw") (pixel-find-bitmap :id "test1") (pixel-find-bitmap :find-origin t :id "test1")
@@ -260,7 +260,7 @@
       (setq foreground (face-attribute 'default :foreground)))
     (unless source-background
       (setq source-background background))
-    (save-excursion   
+    (save-excursion
       (let* ((first-pos (progn (goto-char (plist-get origin :beginning))
                                (point-at-bol)))
              (src-end (progn (goto-char (plist-get origin :end))
@@ -467,22 +467,11 @@
                    ))))
   state)
 
-(defun foo (list)
-  (lambda ()
-    (print (sort list (lambda (a b)
-                        (print a)
-                        (print b)
-                        (if (eq (nth 1 a) (nth 1 b))
-                            (< (nth 0 a) (nth 0 b))
-                          (< (nth 1 a) (nth 1 b)))
-                        )))))
-
-(funcall (foo '((1 0 "bar" nil) (0 1 "blubb" nil) (0 0 "foo" nil))))
-
 (defun pixel-canvas-replace (editor bitmap))
+
 ;;
 ;; Action Utilities
-;; 
+;;
 
 (defun pixel-make-canvas-click (input type editor x y color alpha)
   (lambda (&optional pos)
