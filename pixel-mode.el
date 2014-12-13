@@ -6,9 +6,7 @@
 
 (setq pixel-types-regex "\\(int\\|float\\)")
 
-(defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (mm nil) (quick nil))
-  (unless mm
-    (setq mm major-mode))
+(defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil))
   (unless (or palette bitmap)
     (setq palette t
           bitmap t))
@@ -24,9 +22,9 @@
                "[^ \t\n]+"))
          (quick-re (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
                            ;; comment   palette/bitmap   1:specific or any name
-                           "\\(?:[ \t/\*;#%]*palette:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
+                           "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
                            ;; comment, 2:specific or any palette name when init=bitmap, whole thing may be optional
-                           ;; a bitmap without a using param can be itself a palette, when it has colors packed in (rgb triples)
+                           ;; a bitmap without a palette param can be itself a palette, when it has colors packed in (rgb triples)
                            "\\(?:[ \t/\*;#%]*format:[ \t]*\\(" "[^ \t\n]+" "\\)" "[ \t\n]+" "\\)?"
                            ;; 3:format of the image (rgba or rgb, defaults to rgb)
                            ))
@@ -41,6 +39,11 @@
                      ))))
     (concat quick-re full-re)))
 
+(defun* pixel-verify-match (&key (bitmap nil) (palette nil) (id nil) (match nil))
+  (and (match-string 0 match)
+       (> (length (match-string 0 match)) 0)
+       (if (stringp id) (string-equal (match-string 1 match) id) t)))
+
 (defun pixel-mapx (x f xs)
   (when (< x 1)
     (setq x 1))
@@ -48,7 +51,7 @@
     (loop for n from 0 below steps
           collect (apply f n (subseq xs (* n x) (+ (* n x) x))))))
 
-;; (pixel-mapx 3 (lambda (&rest args) (print args)) '(1 2 3 4 5 6 7 8 9 10))
+;; (pixel-mapx 2 (lambda (&rest args) (print args)) '(1 2 3 4 5 6 7 8 9 10))
 
 (defun pixel-find-comma (source)
   (save-match-data
@@ -78,78 +81,79 @@
 
 ;; (pixel-find-type '(0 0 0 0 0.1))
 
-(defun pixel-read-bitmap-at-point (&optional point)
+(defun pixel-read-bitmap (&optional marker)
   (interactive)
-  (save-excursion
-    (when point
-      (goto-char point))
-    (when (thing-at-point-looking-at (pixel-regex :bitmap t :mm major-mode))
-      (let* ((id (match-string-no-properties 1))
-             (palette-id (or (match-string-no-properties 2) id))
-             (format (or (match-string-no-properties 3) "nil"))
-             (array (match-string-no-properties 9))
-             (comma (pixel-find-comma array))
-             (stride (let ((c (or (read (or (match-string-no-properties 7) "nil"))
-                                        (cond ((string-equal format "rgba")
-                                               4)
-                                              ((string-equal format "rgb")
-                                               3)
-                                              ((not (string-equal palette-id id))
-                                               1)
-                                              (t
-                                               (pixel-find-stride array comma))))))
-                             (cond ((and (eq c 4) (string-equal format "nil"))
-                                    (progn (setq format "rgba") c))
-                                   ((and (eq c 3) (string-equal format "nil"))
-                                    (progn (setq format "rgb") c))
-                                   ((and (eq c 1) (string-equal format "nil"))
-                                    (progn (setq format "palette") c))
-                                   (t c))))
-             (w (or (read (or (match-string-no-properties 5) "nil"))
-                    (/ (pixel-find-width array comma) stride)))
-             (h (or (read (or (match-string-no-properties 6) "nil"))
-                    (pixel-find-height array)))
-             (open (match-string-no-properties 8))
-             (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")")))
-             (type (or (match-string-no-properties 4)
-                       (pixel-find-type numbers)))
-             (d (- (length numbers) (* w h stride)))
-             (palette (when (string-equal id palette-id) (plist-get (plist-get (pixel-read-palette-at-point) :palette) :colors)))
-             (alpha (make-vector (* w h) 1))
-             (array (apply 'vector (pixel-mapx stride (lambda (n &rest color)
-                                                   (cond ((eq (length color) 3)
-                                                          (position (apply 'color-rgb-to-hex (pixel-normalize-color type color))
-                                                                    palette :test 'equal))
-                                                         ((eq (length color) 4)
-                                                          (progn
-                                                            (setf (elt alpha n) (nth 3 color))
-                                                            (position (apply 'color-rgb-to-hex (butlast (pixel-normalize-color type color) 1))
-                                                                      palette :test 'equal)))
-                                                         (t (car color))))
-                                               (append numbers (make-list d 0))))))
-        (list :bitmap (list :id id
-                            :palette-id palette-id
-                            :format format
-                            :type type
-                            :width w
-                            :height h
-                            :stride stride
-                            :open open
-                            :comma comma
-                            :array array
-                            :alpha alpha
-                            :close (cond ((string-equal open "(")
-                                          ")")
-                                         ((string-equal open "[")
-                                          "]")
-                                         ((string-equal open "{")
-                                          "}")))
-              :bitmap-origin (list :id id
-                                   :beginning (match-beginning 0)
-                                   :end (match-end 0)
-                                   :array-beginning (match-beginning 9)
-                                   :array-end (match-end 9)
-                                   :buffer (current-buffer)))))))
+  (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
+    (save-excursion
+      (when (markerp marker)
+        (goto-char (marker-position marker)))
+      (when (thing-at-point-looking-at (pixel-regex :bitmap t))
+        (let* ((id (match-string-no-properties 1))
+               (palette-id (or (match-string-no-properties 2) id))
+               (format (or (match-string-no-properties 3) "nil"))
+               (array (match-string-no-properties 9))
+               (comma (pixel-find-comma array))
+               (stride (let ((c (or (read (or (match-string-no-properties 7) "nil"))
+                                    (cond ((string-equal format "rgba")
+                                           4)
+                                          ((string-equal format "rgb")
+                                           3)
+                                          ((not (string-equal palette-id id))
+                                           1)
+                                          (t
+                                           (pixel-find-stride array comma))))))
+                         (cond ((and (eq c 4) (string-equal format "nil"))
+                                (progn (setq format "rgba") c))
+                               ((and (eq c 3) (string-equal format "nil"))
+                                (progn (setq format "rgb") c))
+                               ((and (eq c 1) (string-equal format "nil"))
+                                (progn (setq format "palette") c))
+                               (t c))))
+               (w (or (read (or (match-string-no-properties 5) "nil"))
+                      (/ (pixel-find-width array comma) stride)))
+               (h (or (read (or (match-string-no-properties 6) "nil"))
+                      (pixel-find-height array)))
+               (open (match-string-no-properties 8))
+               (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")")))
+               (type (or (match-string-no-properties 4)
+                         (pixel-find-type numbers)))
+               (d (- (length numbers) (* w h stride)))
+               (palette (when (string-equal id palette-id) (plist-get (plist-get (pixel-read-palette marker) :palette) :colors)))
+               (alpha (make-vector (* w h) 1))
+               (array (apply 'vector (pixel-mapx stride (lambda (n &rest color)
+                                                          (cond ((eq (length color) 3)
+                                                                 (position (apply 'color-rgb-to-hex (pixel-normalize-color type color))
+                                                                           palette :test 'equal))
+                                                                ((eq (length color) 4)
+                                                                 (progn
+                                                                   (setf (elt alpha n) (nth 3 color))
+                                                                   (position (apply 'color-rgb-to-hex (butlast (pixel-normalize-color type color) 1))
+                                                                             palette :test 'equal)))
+                                                                (t (car color))))
+                                                 (append numbers (make-list d 0))))))
+          (list :bitmap (list :id id
+                              :palette-id palette-id
+                              :format format
+                              :type type
+                              :width w
+                              :height h
+                              :stride stride
+                              :open open
+                              :comma comma
+                              :array array
+                              :alpha alpha
+                              :close (cond ((string-equal open "(")
+                                            ")")
+                                           ((string-equal open "[")
+                                            "]")
+                                           ((string-equal open "{")
+                                            "}")))
+                :bitmap-origin (list :id id
+                                     :beginning (match-beginning 0)
+                                     :end (match-end 0)
+                                     :array-beginning (match-beginning 9)
+                                     :array-end (match-end 9)
+                                     :buffer (current-buffer))))))))
 
 (defun pixel-find-stride (source &optional comma)
   (let ((w (pixel-find-width source comma)))
@@ -160,70 +164,71 @@
           (t
            3))))
 
-(defun pixel-read-palette-at-point (&optional point)
+(defun pixel-read-palette (&optional marker)
   (interactive)
-  (save-excursion
-    (when point
-      (goto-char point))
-    (when (thing-at-point-looking-at (pixel-regex :mm major-mode))
-      (let* ((id (match-string-no-properties 1))
-             (palette-id (match-string-no-properties 2))
-             (format (or (match-string-no-properties 3) "nil"))
-             (array (match-string-no-properties 9))
-             (comma (pixel-find-comma array))
-             (stride (let ((c (or (read (or (match-string-no-properties 7) "nil"))
-                                  (cond ((string-equal format "rgba")
-                                         4)
-                                        ((string-equal format "rgb")
-                                         3)
-                                        ((not (string-equal palette-id id))
-                                         1)
-                                        (t
-                                         (pixel-find-stride array comma))))))
-                       (cond ((and (eq c 4) (string-equal format "nil"))
-                              (progn (setq format "rgba") c))
-                             ((and (eq c 3) (string-equal format "nil"))
-                              (progn (setq format "rgb") c))
-                             ((and (eq c 1) (string-equal format "nil"))
-                              (progn (setq format "palette") c))
-                             (t c))))
-             (w (or (read (or (match-string-no-properties 5) "nil"))
-                    (/ (pixel-find-width array comma) stride)))
-             (h (or (read (or (match-string-no-properties 6) "nil"))
-                    (pixel-find-height array)))
-             (open (match-string-no-properties 8))
-             (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")")))
-             (type (or (match-string-no-properties 4)
-                       (pixel-find-type numbers)))
-             (colors (let ((colors))
-                       (progn
-                         (dotimes (i (* h w) colors)
-                           (let ((r (nth (+ (* i stride) 0) numbers))
-                                 (g (nth (+ (* i stride) 1) numbers))
-                                 (b (nth (+ (* i stride) 2) numbers)))
-                             (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t)
-                             ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
-                             )))))
-             (symbols (loop for i from 0 upto (length colors) collect (prin1-to-string i))))
-        (list :palette (list :id id
-                             :colors colors
-                             :symbols symbols
-                             :format format
-                             :type type
-                             :open open
-                             :comma comma
-                             :close (cond ((string-equal open "(")
-                                           ")")
-                                          ((string-equal open "[")
-                                           "]")
-                                          ((string-equal open "{")
-                                           "}")))
-              :palette-origin (list :id
-                                    :beginning (match-beginning 0)
-                                    :end (match-end 0)
-                                    :array-beginning (match-beginning 9)
-                                    :array-end (match-end 9)
-                                    :buffer (current-buffer)))))))
+  (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
+    (save-excursion
+      (when (markerp marker)
+        (goto-char (marker-position marker)))
+      (when (thing-at-point-looking-at (pixel-regex))
+        (let* ((id (match-string-no-properties 1))
+               (palette-id (match-string-no-properties 2))
+               (format (or (match-string-no-properties 3) "nil"))
+               (array (match-string-no-properties 9))
+               (comma (pixel-find-comma array))
+               (stride (let ((c (or (read (or (match-string-no-properties 7) "nil"))
+                                    (cond ((string-equal format "rgba")
+                                           4)
+                                          ((string-equal format "rgb")
+                                           3)
+                                          ((not (string-equal palette-id id))
+                                           1)
+                                          (t
+                                           (pixel-find-stride array comma))))))
+                         (cond ((and (eq c 4) (string-equal format "nil"))
+                                (progn (setq format "rgba") c))
+                               ((and (eq c 3) (string-equal format "nil"))
+                                (progn (setq format "rgb") c))
+                               ((and (eq c 1) (string-equal format "nil"))
+                                (progn (setq format "palette") c))
+                               (t c))))
+               (w (or (read (or (match-string-no-properties 5) "nil"))
+                      (/ (pixel-find-width array comma) stride)))
+               (h (or (read (or (match-string-no-properties 6) "nil"))
+                      (pixel-find-height array)))
+               (open (match-string-no-properties 8))
+               (numbers (read (concat "(" (save-match-data (replace-regexp-in-string "[^0-9\\.]" " " array)) ")")))
+               (type (or (match-string-no-properties 4)
+                         (pixel-find-type numbers)))
+               (colors (let ((colors))
+                         (progn
+                           (dotimes (i (* h w) colors)
+                             (let ((r (nth (+ (* i stride) 0) numbers))
+                                   (g (nth (+ (* i stride) 1) numbers))
+                                   (b (nth (+ (* i stride) 2) numbers)))
+                               (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t)
+                               ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
+                               )))))
+               (symbols (loop for i from 0 upto (length colors) collect (prin1-to-string i))))
+          (list :palette (list :id id
+                               :colors colors
+                               :symbols symbols
+                               :format format
+                               :type type
+                               :open open
+                               :comma comma
+                               :close (cond ((string-equal open "(")
+                                             ")")
+                                            ((string-equal open "[")
+                                             "]")
+                                            ((string-equal open "{")
+                                             "}")))
+                :palette-origin (list :id
+                                      :beginning (match-beginning 0)
+                                      :end (match-end 0)
+                                      :array-beginning (match-beginning 9)
+                                      :array-end (match-end 9)
+                                      :buffer (current-buffer))))))))
 
 (defun pixel-origin-p (origin)
   (when (and (listp origin)
@@ -232,69 +237,72 @@
              (plist-get origin :buffer))
     origin))
 
+(defun pixel-origin-marker (origin)
+  (set-marker (make-marker) (plist-get origin :beginning) (plist-get origin :buffer)))
+
 (defun* pixel-list-buffer ()
-  (let ((mm major-mode)
-        (result '()))
-    (loop for buf in (buffer-list)
-          do (pixel-cached (lambda (&rest args)
-                             (with-current-buffer buf
+  (pixel-cached (lambda (&rest args)
+                  (let ((result '()))
+                    (loop for buf in (buffer-list)
+                          do (with-current-buffer buf
                                (when (and (not buffer-read-only)
                                           (buffer-file-name (current-buffer))
-                                          ;; (not (eq major-mode 'org-mode))
-                                          ;; (or (eq major-mode 'c-mode)
-                                          ;;     (eq major-mode 'emacs-lisp-mode))
                                           (save-excursion
                                             (goto-char (point-min))
                                             (let ((case-fold-search nil))
-                                              (re-search-forward (pixel-regex :mm major-mode :quick t) nil t))))
+                                              (re-search-forward (pixel-regex :quick t) nil t))))
                                  (add-to-list 'result buf))))
-                           'pixel-buffer-cache
-                           :id (buffer-name buf)))
-    result))
+                    result))
+                'pixel-buffer-cache
+                :id "pixel-buffers"))
 
-(defun* pixel-find-palette (&key (id nil) (bitmap nil) (point nil) (origin nil) (find-origin nil))
-  (cond ((numberp point)
-         (plist-get (pixel-read-palette-at-point point) (if find-origin :palette-origin :palette)))
+(defun* pixel-find-palette (&key (id nil) (bitmap nil) (marker nil) (origin nil) (find-origin nil))
+  (cond ((markerp marker)
+         (plist-get (pixel-read-palette marker) (if find-origin :palette-origin :palette)))
         ((pixel-origin-p origin)
-         (plist-get (pixel-read-palette-at-point (plist-get origin :beginning)) (if find-origin :palette-origin :palette)))
+         (plist-get (pixel-read-palette (pixel-origin-marker origin)) (if find-origin :palette-origin :palette)))
         ((or (stringp id)
              (and (pixel-bitmap-p bitmap) (setq id (plist-get bitmap :palette-id))))
          (save-excursion
            (goto-char (point-min))
            (let ((case-fold-search nil))
-             (if (re-search-forward (pixel-regex :palette id :mm major-mode :id id) nil t)
-                 (plist-get (pixel-read-palette-at-point) (if find-origin :palette-origin :palette))
+             (if (and (re-search-forward (pixel-regex :palette id :id id) nil t)
+                      (pixel-verify-match :id id))
+                 (plist-get (pixel-read-palette) (if find-origin :palette-origin :palette))
                (let ((buffers (pixel-list-buffer))
                      (result nil))
-                 (while (and buffers
-                             (not (with-current-buffer (pop buffers)
-                                    (save-excursion
-                                      (goto-char (point-min))
-                                      (when (re-search-forward (pixel-regex :palette id :mm major-mode :id id) nil t)
-                                        (setq result (plist-get (pixel-read-palette-at-point) (if find-origin :palette-origin :palette)))))))))
+                 (while (and buffers (not result))
+                   (with-current-buffer (pop buffers)
+                     (save-excursion
+                       (goto-char (point-min))
+                       (when (and (re-search-forward (pixel-regex :palette id :id id) nil t)
+                                  (pixel-verify-match :id id))
+                         (setq result (plist-get (pixel-read-palette) (if find-origin :palette-origin :palette)))))))
                  result)))))))
 
 ;; (pixel-find-palette :bitmap (pixel-find-bitmap :id "test1"))
 
-(defun* pixel-find-bitmap (&key (id nil) (point nil) (origin nil) (find-origin nil))
-  (cond ((numberp point)
-         (plist-get (pixel-read-bitmap-at-point point) (if find-origin :bitmap-origin :bitmap)))
+(defun* pixel-find-bitmap (&key (id nil) (marker nil) (origin nil) (find-origin nil))
+  (cond ((markerp marker)
+         (plist-get (pixel-read-bitmap marker) (if find-origin :bitmap-origin :bitmap)))
         ((pixel-origin-p origin)
-         (plist-get (pixel-read-bitmap-at-point (plist-get origin :beginning)) (if find-origin :bitmap-origin :bitmap)))
+         (plist-get (pixel-read-bitmap (pixel-origin-marker origin)) (if find-origin :bitmap-origin :bitmap)))
         ((stringp id)
          (save-excursion
            (goto-char (point-min))
            (let ((case-fold-search nil))
-             (if (re-search-forward (pixel-regex :bitmap t :mm major-mode :id id) nil t)
-                 (plist-get (pixel-read-bitmap-at-point) (if find-origin :bitmap-origin :bitmap))
+             (if (and (re-search-forward (pixel-regex :bitmap t :id id) nil t)
+                      (pixel-verify-match :id id))
+                 (plist-get (pixel-read-bitmap) (if find-origin :bitmap-origin :bitmap))
                (let ((buffers (pixel-list-buffer))
                      (result nil))
-                 (while (and buffers
-                             (not (with-current-buffer (pop buffers)
-                                    (save-excursion
-                                      (goto-char (point-min))
-                                      (when (re-search-forward (pixel-regex :bitmap t :mm major-mode :id id) nil t)
-                                        (setq result (plist-get (pixel-read-bitmap-at-point) (if find-origin :bitmap-origin :bitmap)))))))))
+                 (while (and buffers (not result))
+                   (with-current-buffer (pop buffers)
+                     (save-excursion
+                       (goto-char (point-min))
+                       (when (and (re-search-forward (pixel-regex :bitmap t :id id) nil t)
+                                  (pixel-verify-match :id id))
+                         (setq result (plist-get (pixel-read-bitmap) (if find-origin :bitmap-origin :bitmap)))))))
                  result)))))))
 
 (defun* pixel-list-editor (&key (buffer nil))
@@ -305,7 +313,7 @@
                (save-excursion
                  (goto-char (point-min))
                  (let ((case-fold-search nil))
-                   (while (re-search-forward (pixel-regex :bitmap t :mm major-mode :quick t) nil t)
+                   (while (re-search-forward (pixel-regex :bitmap t :quick t) nil t)
                      (let ((overlays (overlays-at (point))))
                        (dolist (ov overlays)
                          (let ((editor (overlay-get ov 'pixel-editor)))
@@ -321,14 +329,14 @@
                (save-excursion
                  (goto-char (point-min))
                  (let ((case-fold-search nil))
-                   (while (re-search-forward (pixel-regex :bitmap t :mm major-mode) nil t)
+                   (while (re-search-forward (pixel-regex :bitmap t) nil t)
                      (let ((id (match-string 1)))
                        (add-to-list 'result (if list-origin
-                                                (plist-get (pixel-read-bitmap-at-point) :bitmap-origin)
-                                              (pixel-cached (lambda (&rest args) (plist-get (pixel-read-bitmap-at-point) :bitmap))
+                                                (plist-get (pixel-read-bitmap) :bitmap-origin)
+                                              (pixel-cached (lambda (&rest args) (plist-get (pixel-read-bitmap) :bitmap))
                                                             'pixel-bitmap-cache
                                                             :id id))))
-                     ;;(add-to-list 'result (plist-get (pixel-read-bitmap-at-point) (if list-origin :bitmap-origin :bitmap)))
+                     ;;(add-to-list 'result (plist-get (pixel-read-bitmap) (if list-origin :bitmap-origin :bitmap)))
                      )))))
     result))
 
@@ -367,15 +375,15 @@
 ;;   (pixel-cached 'test-foo 'test-cache :id "bar")
 ;;   (print (gethash "bar" test-cache)))
 
-(defun* pixel-toggle-editor (&key (id nil) (point nil) (origin nil) (remove-active t))
+(defun* pixel-toggle-editor (&key (id nil) (marker nil) (origin nil) (remove-active t))
   (interactive)
   (unless (pixel-origin-p origin)
     (setq origin (cond ((stringp id)
                         (pixel-find-bitmap :id id :find-origin t))
-                       ((numberp point)
-                        (pixel-find-bitmap :point point :find-origin t))
+                       ((markerp marker)
+                        (pixel-find-bitmap :marker marker :find-origin t))
                        (pixel-mode
-                        (pixel-find-bitmap :point (point) :find-origin t)))))
+                        (pixel-find-bitmap :marker (set-marker (make-marker) (point)) :find-origin t)))))
   (let ((editor (pixel-find-editor :origin origin))
         (modified-state (buffer-modified-p)))
     (when (and editor remove-active)
