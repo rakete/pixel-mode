@@ -299,7 +299,7 @@
              (disable-point-adjustment t))
         (pixel-editor-put editor :editor-foreground foreground)
         (pixel-editor-put editor :editor-background background)
-        (pixel-editor-put editor :editor-zoomlevel 12)
+        (pixel-editor-put editor :editor-zoomlevel 8)
         (pixel-editor-put editor :editor-indentation 20)
         (pixel-editor-put editor :palette-id (plist-get bitmap :palette-id))
         (pixel-editor-put editor :palette-rowlength 32)
