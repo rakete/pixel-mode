@@ -414,7 +414,7 @@
             (save-excursion
               (re-search-forward (concat "\\(\\(?:[0-9.]+\\([" (regexp-quote comma) "\n]*\\)\\)\\{" (prin1-to-string stride) "\\}\\)") (overlay-end ov-array))
               ;;(print (match-string-no-properties 1))
-              (replace-match (concat color (match-string 2)) 1))))))))
+              (replace-match (concat color (match-string 2)) t nil nil 1))))))))
 
 ;;
 ;; Canvas Tools
@@ -468,22 +468,118 @@
 ;;                    ))))
 ;;   state)
 
-(defun pixel-canvas-replace (editor bitmap))
+(defun pixel-canvas-refresh (editor)
+  (let* ((p (point))
+         (id (pixel-editor-get editor :id))
+         (ov-source (pixel-editor-get editor :ov-source))
+         (auto-window-vscroll nil)
+         (scroll-conservatively 10000)
+         (scroll-step 1)
+         (scroll-margin 1)
+         (scroll-conservatively 0)
+         (scroll-up-aggressively 0.01)
+         (scroll-down-aggressively 0.01)
+         (deactivate-mark nil)
+         )
+    (save-excursion
+      (save-restriction
+        (goto-char (overlay-start ov-source))
+        (pixel-toggle-editor :id id)
+        (pixel-toggle-editor :id id)
+        ))
+    (goto-char p)
+    nil))
+
+(defun pixel-canvas-replace (editor bitmap)
+  (with-current-buffer (pixel-editor-buffer editor)
+    (save-excursion
+      (let* ((ov-array (pixel-editor-get editor :ov-array))
+             (ov-source (pixel-editor-get editor :ov-source))
+             (id (pixel-editor-get editor :bitmap-id))
+             (new-palette (plist-get bitmap :palette))
+             (new-format (plist-get bitmap :format))
+             (new-type (plist-get bitmap :type))
+             (new-width (plist-get bitmap :width))
+             (new-height (plist-get bitmap :height))
+             (new-stride (plist-get bitmap :stride))
+             (new-array (plist-get bitmap :array))
+             (source (buffer-substring (overlay-start ov-source) (overlay-end ov-source)))
+             (comma (pixel-find-comma source)))
+        (goto-char (overlay-start ov-source))
+        (looking-at (pixel-regex :bitmap id :id id))
+        (when (and new-palette
+                   (match-string 2))
+          (replace-match new-palette t nil nil 2))
+        (when (and new-format
+                   (match-string 3))
+          (replace-match new-format t nil nil 3))
+        (when (and new-type
+                   (match-string 4))
+          (replace-match new-type t nil nil 4))
+        (when (and new-width
+                   (match-string 5))
+          (replace-match (prin1-to-string new-width) t nil nil 5))
+        (when (and new-height
+                   (match-string 6))
+          (replace-match (prin1-to-string new-height) t nil nil 6))
+        (when (and new-stride
+                   (match-string 7))
+          (replace-match (prin1-to-string new-stride) t nil nil 7))
+        (when (and new-array
+                   (match-string 9))
+          (let* ((w 0)
+                 (h 0)
+                 ;;(new-width 4)
+                 ;;(new-height 4)
+                 ;;(new-array (make-vector 9 2))
+                 (new-array-string (mapconcat #'identity
+                                              (loop for i from 0 below (* new-width new-height)
+                                                    do (if (< w new-width)
+                                                           (setq w (1+ w))
+                                                         (setq w 1)
+                                                         (setq h (1+ h)))
+                                                    collect (cond
+                                                             ((and (eq w new-width) (< h (1- new-height)))
+                                                              (concat (prin1-to-string (condition-case nil (elt new-array i) (error 0))) "\n"))
+                                                             (t
+                                                              (prin1-to-string (condition-case nil (elt new-array i) (error 0))))))
+                                              " ")))
+            ;;new-array-string
+            (replace-match new-array-string t nil nil 9)
+            ))
+        (pixel-canvas-refresh editor)
+        ))))
+
+(defun pixel-canvas-resize (editor add-width add-height)
+  (let* ((id (pixel-editor-get editor :id))
+         (bitmap (pixel-bitmap-resize (pixel-find-bitmap :id id) add-width add-height))
+         (l (line-number-at-pos)))
+    (pixel-canvas-replace editor bitmap)
+    (goto-line l)))
 
 ;;
 ;; Action Utilities
 ;;
 
-(defun pixel-make-canvas-click (input type editor x y color alpha)
+(defun pixel-make-canvas-click (input type editor)
   (lambda (&optional pos)
     (interactive)
-    (let ((tool (pixel-editor-get editor :tool-current)))
+    (let* ((x (get-text-property (point) 'pixel-x))
+           (y (get-text-property (point) 'pixel-y))
+           (color (get-text-property (point) 'pixel-color))
+           (alpha (get-text-property (point) 'pixel-alpha))
+           (tool (pixel-editor-get editor :tool-current)))
       (pixel-canvas-merge editor (funcall tool input type editor x y color alpha)))))
 
-(defun pixel-make-canvas-motion (input type editor x y color alpha)
+(defun pixel-make-canvas-motion (input type editor)
   (lambda (event)
     (interactive "e")
     (let* ((tool (pixel-editor-get editor :tool-current))
+           (p (posn-point (event-start event)))
+           (x (get-text-property p 'pixel-x))
+           (y (get-text-property p 'pixel-y))
+           (color (get-text-property p 'pixel-color))
+           (alpha (get-text-property p 'pixel-alpha))
            (state (funcall tool input type editor x y color alpha))
            (last-x x)
            (last-y y)
@@ -510,17 +606,19 @@
               ))))
       (pixel-canvas-merge editor state))))
 
-(defun pixel-make-canvas-keymap (editor x y color alpha)
+(defun pixel-make-canvas-keymap (editor)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
-    (define-key map (kbd "<RET>") (pixel-make-canvas-click 'keyboard 'single editor x y color alpha))
-    (define-key map (kbd "<SPC>") (pixel-make-canvas-click 'keyboard 'single editor x y color alpha))
-    (define-key map (kbd "<double-mouse-1>") (pixel-make-canvas-motion 'mouse1 'double editor x y color alpha))
-    (define-key map (kbd "<double-mouse-2>") (pixel-make-canvas-motion 'mouse2 'double editor x y color alpha))
-    (define-key map (kbd "<double-mouse-3>") (pixel-make-canvas-motion 'mouse3 'double editor x y color alpha))
-    (define-key map (kbd "<down-mouse-1>") (pixel-make-canvas-motion 'mouse1 'single editor x y color alpha))
-    (define-key map (kbd "<down-mouse-2>") (pixel-make-canvas-motion 'mouse2 'single editor x y color alpha))
-    (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-motion 'mouse3 'single editor x y color alpha))
+    (define-key map (kbd "<RET>") (pixel-make-canvas-click 'keyboard 'single editor))
+    (define-key map (kbd "<SPC>") (pixel-make-canvas-click 'keyboard 'single editor))
+    (define-key map (kbd "<double-mouse-1>") (pixel-make-canvas-motion 'mouse1 'double editor))
+    (define-key map (kbd "<double-mouse-2>") (pixel-make-canvas-motion 'mouse2 'double editor))
+    (define-key map (kbd "<double-mouse-3>") (pixel-make-canvas-motion 'mouse3 'double editor))
+    (define-key map (kbd "<down-mouse-1>") (pixel-make-canvas-motion 'mouse1 'single editor))
+    (define-key map (kbd "<down-mouse-2>") (pixel-make-canvas-motion 'mouse2 'single editor))
+    (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-motion 'mouse3 'single editor))
+    (define-key map (kbd "S-<right>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor 1 0)))
+    (define-key map (kbd "S-<left>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor -1 0)))
     map))
 
 (defun pixel-make-palette-click (input type editor color)

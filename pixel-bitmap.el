@@ -150,25 +150,24 @@
 
 ;; (pixel-bitmap-alpha (pixel-make-bitmap :background 0) :color 0)
 
-(defun pixel-bitmap-resize (bitmap w h color)
+(defun pixel-bitmap-resize (bitmap add-width add-height)
   (let* ((width (plist-get bitmap :width))
          (height (plist-get bitmap :height))
-         (new-width (+ width w))
-         (new-height (+ height h))
+         (new-width (+ width add-width))
+         (new-height (+ height add-height))
          (old-array (plist-get bitmap :array))
-         (new-array (make-vector (* new-width new-height) color)))
+         (new-array (make-vector (* new-width new-height) 0))
+         (new-bitmap (pixel-make-bitmap :width new-width
+                                        :height new-height)))
     (dotimes (y new-width)
       (dotimes (x new-height)
         (when (and (< x width) (< y height))
           (aset new-array
-                (pixel-bitmap-index (pixel-make-bitmap :width new-width
-                                                       :height new-height
-                                                       :background color)
-                                    x y)
+                (pixel-bitmap-index new-bitmap x y)
                 (pixel-bitmap-ref bitmap x y)))))
-    (plist-put bitmap :array new-array)))
+    (plist-put new-bitmap :array new-array)))
 
-;; (print (pixel-bitmap-resize (pixel-make-bitmap :width 4 :height 4) 0 0 1))
+;; (print (pixel-bitmap-resize (pixel-make-bitmap :width 1 :height 1) 1 0))
 
 (defun pixel-bitmap-p (bitmap)
   (when (and (listp bitmap)
