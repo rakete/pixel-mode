@@ -481,7 +481,6 @@
   :keymap (let ((map (make-sparse-keymap)))
             ;;(define-key map (kbd "C-c C-c") 'pixel)
             map)
-  (buffer-disable-undo)
   (if (not pixel-mode)
       (progn
         (mapc 'pixel-editor-remove (pixel-list-editor :buffer (current-buffer)))
@@ -493,7 +492,6 @@
       (add-hook 'before-save-hook 'pixel-before-save)
       (add-hook 'after-save-hook 'pixel-after-save)
       (dolist (origin (pixel-list-bitmap :buffer (current-buffer) :list-origin t))
-        (pixel-toggle-editor :origin origin))))
-  (buffer-enable-undo))
+        (pixel-toggle-editor :origin origin)))))
 
 (provide 'pixel-mode)
