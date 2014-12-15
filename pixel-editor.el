@@ -25,17 +25,18 @@
 (defun pixel-make-image (&rest keys)
   (find-image (list keys)))
 
-(defun pixel-make-hover-face (id fg &optional hex x y)
-  (let* ((sym (intern (cond ((and x y)
-                             (format "%s|%s|%d|%d" id (replace-regexp-in-string "#" "" fg) x y))
-                            ((stringp hex)
-                             (format "%s|%s|%s" id (replace-regexp-in-string "#" "" fg) (replace-regexp-in-string "#" "" hex)))
-                            (t
-                             (format "%s|%s" id (replace-regexp-in-string "#" "" fg))))))
-         (face (make-face sym)))
-    (face-spec-reset-face face)
-    (set-face-attribute face nil :box (list :line-width 3 :color fg :style nil))
-    face))
+(defvar pixel-hover-face-cache (make-hash-table :test 'equal))
+
+(defun pixel-make-hover-face (id x y)
+  (let ((name (format "%s|%d|%d" id x y)))
+    (or (gethash name pixel-hover-face-cache nil)
+        (puthash name
+                 (let* ((sym (intern name))
+                        (face (make-face sym)))
+                   (face-spec-reset-face face)
+                   (set-face-attribute face nil :box (list :line-width 3 :color "#ffffff" :style nil))
+                   face)
+                 pixel-hover-face-cache))))
 
 (defun pixel-copy-hover-face (face &optional hex x y)
   (print (face-attribute face :box t 'default))
@@ -50,14 +51,14 @@
 (defvar pixel-pixel-cache (make-hash-table :test 'equal))
 
 (defun pixel-make-pixel (color width &optional height)
-  (let ((key (format "xpm|%d*%d|%s" width (or height width) (replace-regexp-in-string "#" "" color))))
-    (cons 'image (cdr (or (gethash key pixel-pixel-cache nil)
-                          (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width) :background 0))))
+  (let ((key (format "%d%d%s" width (or height width) color)))
+    (append (list 'image) (cdr (or (gethash key pixel-pixel-cache nil)
+                                   (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width)))))
                                          (pixel-make-image :type 'xpm
                                                            :data template
                                                            :color-symbols `(("col0"  . ,color))
                                                            :height (or height width)))
-                                   pixel-pixel-cache))))))
+                                            pixel-pixel-cache))))))
 
 (defun pixel-map-text-properties (start end props f &optional buffer)
   (with-current-buffer (or buffer (current-buffer))
@@ -155,7 +156,7 @@
                                 'pixel-palette t)))
           (let* ((c (nth n colors))
                  (icon (pixel-make-pixel c rowheight))
-                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face" (color-complement-hex avg) c)))
+                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face" n 0)))
             (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
                                     (propertize " " 'intangible 'editor) ;;
@@ -183,11 +184,10 @@
              (palette (pixel-find-palette :bitmap bitmap))
              (colors (apply 'vector (plist-get palette :colors)))
              (alphas (plist-get bitmap :alpha))
-             (avg (pixel-palette-average palette))
              (whitespace (pixel-make-pixel bg indentation (* zoomlevel 2)))
-             ;;(id (plist-get bitmap :id))
              (inhibit-point-motion-hooks t)
-             (disable-point-adjustment t))
+             (disable-point-adjustment t)
+             (keymap (pixel-make-canvas-keymap editor)))
         (delete-region (overlay-start ov) (overlay-end ov))
         (goto-char start)
         (dotimes (y h)
@@ -201,7 +201,7 @@
                    (c (elt colors v))
                    (a (elt alphas v))
                    (pixel (pixel-make-pixel c (* zoomlevel 2)))
-                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face" (color-complement-hex avg) nil x y)))
+                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face" x y)))
               (insert (propertize (if (eq x (- w 1))
                                       (propertize " " 'intangible 'editor)
                                     (propertize " "))
@@ -215,7 +215,8 @@
                                   'line-height t
                                   'line-spacing nil
                                   'mouse-face hover-face
-                                  'keymap (pixel-make-canvas-keymap editor x y c a)))))
+                                  'keymap keymap
+                                  ))))
           (insert (propertize "\n"
                               'intangible 'editor
                               'pixel-occupied id
@@ -527,7 +528,7 @@
     (interactive)
     (pixel-editor-put editor :palette-foreground color)))
 
-(defun pixel-make-palette-keymap (editor &optional color)
+(defun pixel-make-palette-keymap (editor color)
   (let ((map (make-sparse-keymap)))
     (suppress-keymap map)
     (define-key map (kbd "<RET>") (pixel-make-palette-click 'keyboard 'single editor color))
