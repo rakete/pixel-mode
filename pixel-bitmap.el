@@ -97,12 +97,10 @@
 
 ;; (pixel-bitmap-mapc (lambda (x y v) (print `(,x ,y ,v))) (pixel-make-bitmap :width 2 :h 2))
 
-(defun* pixel-make-bitmap (&key (width 16) (height 16) (background 0) (foreground 1))
-  (let* ((array (make-vector (* width height) background)))
+(defun* pixel-make-bitmap (&key (width 16) (height 16))
+  (let* ((array (make-vector (* width height) 0)))
     (list :width width
           :height height
-          :background background
-          :foreground foreground
           :array array
           :format "palette"
           :comma " "
@@ -208,7 +206,6 @@
 (defun pixel-xpm-data (bitmap)
   (let ((w (plist-get bitmap :width))
         (h (plist-get bitmap :height))
-        (b (plist-get bitmap :array))
         (num-colors 0)
         (pixels nil))
     (with-temp-buffer

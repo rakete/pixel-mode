@@ -126,7 +126,7 @@
              (start (overlay-start ov))
              (colors (plist-get palette :colors))
              (symbols (plist-get palette :symbols))
-             (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight :background 0)))
+             (template (pixel-xpm-data (pixel-make-bitmap :width rowheight :height rowheight)))
              (whitespace (pixel-make-pixel bg indentation rowheight))
              (avg (pixel-palette-average palette))
              (inhibit-point-motion-hooks t)
