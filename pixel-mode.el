@@ -6,7 +6,9 @@
 
 (setq pixel-types-regex "\\(int\\|float\\)")
 
-(defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil))
+(defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
+  (unless mm
+    (setq mm major-mode))
   (unless (or palette bitmap)
     (setq palette t
           bitmap t))
@@ -21,7 +23,7 @@
                  (regexp-quote id)
                "[^ \t\n]+"))
          (quick-re (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
-                           ;; comment   palette/bitmap   1:specific or any name
+                           ;; comment   palette|bitmap   1:specific or any name
                            "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
                            ;; comment, 2:specific or any palette name when init=bitmap, whole thing may be optional
                            ;; a bitmap without a palette param can be itself a palette, when it has colors packed in (rgb triples)
@@ -30,7 +32,18 @@
                            ))
          (full-re (unless quick
                     (concat
-                     "\\(?:" "\\(?:[^\[\(\{\"]*" pixel-types-regex "[ \t]+\\)?[^\[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\]" "\\)?"
+                     (cond ((or (eq mm 'c-mode)
+                                (eq mm 'c++-mode)
+                                (eq mm 'js2-mode))
+                            (concat "\\(?:""\\(?:[^\[\(\{\"]*" pixel-types-regex "[ \t]+\\)?[^\[]+\\[\\([0-9]+\\)\\*\\([0-9]+\\)\\(?:\\*\\([0-9]+\\)\\)?\\]" "\\)?"))
+                           ((or (eq mm 'emacs-lisp-mode)
+                                (eq mm 'lisp-interaction-mode)
+                                (eq mm 'lisp-mode)
+                                (eq mm 'scheme-mode)
+                                (eq mm 'hy-mode))
+                            "\\(?:[^ \t\n]*\\(?:[ \t\n]+\\(?:\\(?:[:']type[: ]*[\"']*\\([a-zA-Z]+\\)[\"']*\\)\\|\\(?:[:']width[: ]*[\"']*\\([0-9]+\\)[\"']*\\)\\|\\(?:[:']height[: ]*[\"']*\\([0-9]+\\)[\"']*\\)\\|\\(?:[:']stride[: ]*[\"']*\\([0-9]+\\)[\"']*\\)\\)\\)\\{0,4\\}\\)")
+                           (t
+                            "\\(\\)\\(\\)\\(\\)\\(\\)"))
                      ;; search for 4:types, if any, then search for c-style array indicator, getting 5:width, 6:height and optionally 7:number of components
                      "\\(?:.*\n\\)*?.*\\(\\[\\|\(\\|\{\\)" "[ \t\n]*?"
                      ;; 8:open
