@@ -555,7 +555,7 @@
          (bitmap (pixel-bitmap-resize (pixel-find-bitmap :id id) add-width add-height))
          (l (line-number-at-pos)))
     (pixel-canvas-replace editor bitmap)
-    (goto-line l)))
+    (goto-line (+ l add-height))))
 
 ;;
 ;; Action Utilities
@@ -619,6 +619,8 @@
     (define-key map (kbd "<down-mouse-3>") (pixel-make-canvas-motion 'mouse3 'single editor))
     (define-key map (kbd "S-<right>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor 1 0)))
     (define-key map (kbd "S-<left>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor -1 0)))
+    (define-key map (kbd "S-<down>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor 0 1)))
+    (define-key map (kbd "S-<up>") (lambda (&optional pos) (interactive) (pixel-canvas-resize editor 0 -1)))
     map))
 
 (defun pixel-make-palette-click (input type editor color)
