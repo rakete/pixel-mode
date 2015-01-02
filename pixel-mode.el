@@ -12,7 +12,7 @@
   (unless (or palette bitmap)
     (setq palette t
           bitmap t))
-  (let* ((palette-id (or (and (stringp palette) palette) "[^ \t\n]+"))
+  (let* ((palette-id (or (and (stringp palette) palette) "[^\t\n]+"))
          (init (cond ((or (stringp palette) (and palette bitmap)) "\\(?:\\<palette\\>\\|\\<bitmap\\>\\)")
                      (palette "\\<palette\\>")
                      (bitmap "\\<bitmap\\>")))
