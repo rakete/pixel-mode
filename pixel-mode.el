@@ -428,14 +428,16 @@
     (when (not editor)
       (let* ((bitmap (pixel-cached 'pixel-find-bitmap 'pixel-bitmap-cache :origin origin))
              (palette (pixel-cached 'pixel-find-palette 'pixel-palette-cache :bitmap bitmap))
-             (editor (pixel-editor-create bitmap palette origin
+             (editor (pixel-editor-create origin
                                           :background "#2f2f2f"
                                           :foreground "#ffffff"
                                           :source-background "#222222")))
-        (pixel-editor-insert-toolbar editor 'pixel 'fill)
-        (pixel-editor-insert-canvas editor bitmap)
+        (pixel-editor-init editor bitmap palette)
         (pixel-editor-insert-palette editor palette)
-        (set-buffer-modified-p modified-state)))))
+        (pixel-editor-insert-toolbar editor)
+        (pixel-editor-insert-canvas editor bitmap palette)
+        (set-buffer-modified-p modified-state)
+        editor))))
 
 (defvar pixel-restore-editor-after-save-list '())
 

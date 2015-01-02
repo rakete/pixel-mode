@@ -50,13 +50,18 @@
 ;;   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y c)))
 
 (defun pixel-bitmap-index (bitmap x y)
-  (+ (* y (plist-get bitmap :width)) x))
+  (+ (* y (or (and (listp bitmap) (plist-get bitmap :width))
+              (and (numberp bitmap) bitmap)))
+     x))
 
 (defun pixel-bitmap-ref (bitmap x y)
   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y)))
 
-(defun pixel-bitmap-alpha-ref (bitmap x y)
+(defun pixel-bitmap-alpha (bitmap x y)
   (aref (plist-get bitmap :alpha) (pixel-bitmap-index bitmap x y)))
+
+(defun pixel-bitmap-color (bitmap x y palette)
+  (aref (plist-get palette :colors) (pixel-bitmap-ref bitmap x y)))
 
 ;; (defun pixel-bitmap-color (bitmap x y palette)
 ;;   (let ((format (plist-get bitmap :format))
@@ -159,8 +164,8 @@
          (new-array (make-vector (* new-width new-height) 0))
          (new-bitmap (pixel-make-bitmap :width new-width
                                         :height new-height)))
-    (dotimes (y new-width)
-      (dotimes (x new-height)
+    (dotimes (x new-width)
+      (dotimes (y new-height)
         (when (and (< x width) (< y height))
           (aset new-array
                 (pixel-bitmap-index new-bitmap x y)
