@@ -24,6 +24,19 @@
 
 ;; (pixel-normalize-color "int" '(255 0 0))
 
+(defun pixel-color-name-to-rgb (type color)
+  (if (string-equal type "int")
+      (when (> (length color) 6)
+        (let ((r (substring color 1 3))
+              (g (substring color 3 5))
+              (b (substring color 5 7)))
+          (list (string-to-number r 16)
+                (string-to-number g 16)
+                (string-to-number b 16))))
+    (color-name-to-rgb color)))
+
+;; (pixel-color-name-to-rgb "float" "#fe9a33")
+
 (defun pixel-palette-average (palette)
   (let* ((ra 0.0)
          (ga 0.0)
@@ -41,6 +54,29 @@
     (apply 'color-rgb-to-hex (list (/ ra size) (/ ga size) (/ ba size)))))
 
 ;;(pixel-palette-average (pixel-find-palette :id "bnw"))
+
+(defun pixel-palette-similar-color (palette color-name)
+  (let* ((rgb (color-name-to-rgb color-name))
+         (r0 (nth 0 rgb))
+         (g0 (nth 1 rgb))
+         (b0 (nth 2 rgb))
+         (colors (mapcar #'color-name-to-rgb (plist-get palette :colors)))
+         (best-distance nil)
+         (most-similar (car-safe colors)))
+    (dolist (rgb colors (apply #'color-rgb-to-hex most-similar))
+      (let* ((r1 (nth 0 rgb))
+             (g1 (nth 1 rgb))
+             (b1 (nth 2 rgb))
+             (dr (- r0 r1))
+             (dg (- g0 g1))
+             (db (- b0 b1))
+             (d (sqrt (+ (* dr dr) (* dg dg) (* db db)))))
+        (when (or (not best-distance)
+                  (< d best-distance))
+          (setq best-distance d
+                most-similar rgb))))))
+
+;; (pixel-palette-similar-color (pixel-find-palette :id "Deluxe-Paint-256") "#ffff00")
 
 ;; (defun pixel-bitmap-index (bitmap x y &optional c)
 ;;   (let ((s (plist-get bitmap :stride)))
