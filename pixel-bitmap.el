@@ -196,10 +196,10 @@
          (height (plist-get bitmap :height))
          (new-width (+ width add-width))
          (new-height (+ height add-height))
-         (old-array (plist-get bitmap :array))
          (new-array (make-vector (* new-width new-height) 0))
-         (new-bitmap (pixel-make-bitmap :width new-width
-                                        :height new-height)))
+         (new-bitmap (copy-list bitmap)))
+    (plist-put new-bitmap :width new-width)
+    (plist-put new-bitmap :height new-height)
     (dotimes (x new-width)
       (dotimes (y new-height)
         (when (and (< x width) (< y height))

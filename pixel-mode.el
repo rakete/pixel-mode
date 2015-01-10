@@ -78,7 +78,7 @@
 (defun pixel-find-comma (source)
   (save-match-data
     (string-match "^[^0-9\\.]*[0-9\\.]+\\([^0-9\\.]+\\)[0-9\\.]+.*" source)
-    (match-string 1 source)))
+    (condition-case nil (match-string 1 source) (error ","))))
 
 ;; (pixel-find-comma ";; { 0, 0, 0, 0, 0, 0, 0")
 
@@ -140,18 +140,26 @@
                (type (or (match-string-no-properties 4)
                          (pixel-find-type numbers)))
                (d (- (length numbers) (* w h stride)))
-               (palette (when (string-equal id palette-id) (plist-get (plist-get (pixel-read-palette marker) :palette) :colors)))
+               (colors (cond ((string-equal id palette-id)
+                              (plist-get (plist-get (pixel-read-palette marker) :palette) :colors))
+                             ((or (string-equal format "rgb")
+                                  (string-equal format "rgba"))
+                              (save-match-data
+                                (plist-get (pixel-find-palette :id palette-id) :colors)))))
                (alpha (make-vector (* w h) 1))
                (array (apply 'vector (pixel-mapx stride (lambda (n &rest color)
-                                                          (cond ((eq (length color) 3)
-                                                                 (position (apply 'color-rgb-to-hex (pixel-normalize-color type color))
-                                                                           palette :test 'equal))
-                                                                ((eq (length color) 4)
-                                                                 (progn
-                                                                   (setf (elt alpha n) (nth 3 color))
-                                                                   (position (apply 'color-rgb-to-hex (butlast (pixel-normalize-color type color) 1))
-                                                                             palette :test 'equal)))
-                                                                (t (car color))))
+                                                          (when (eq (length color) 4)
+                                                            (setf (elt alpha n) (nth 3 color)))
+                                                          (if (or (string-equal id palette-id)
+                                                                  (string-equal format "rgb")
+                                                                  (string-equal format "rgba"))
+                                                              (let* ((color-name (cond ((eq (length color) 3)
+                                                                                         (apply 'color-rgb-to-hex (pixel-normalize-color type color)))
+                                                                                        ((eq (length color) 3)
+                                                                                         (apply 'color-rgb-to-hex (butlast (pixel-normalize-color type color) 1)))))
+                                                                     (pos (position color-name colors :test 'equal)))
+                                                                (or pos (position (pixel-palette-similar-color (list :colors colors) color-name) colors :test 'equal)))
+                                                            (car color)))
                                                  (append numbers (make-list d 0))))))
           (list :bitmap (list :id id
                               :palette-id palette-id
@@ -230,7 +238,7 @@
                              (let ((r (nth (+ (* i stride) 0) numbers))
                                    (g (nth (+ (* i stride) 1) numbers))
                                    (b (nth (+ (* i stride) 2) numbers)))
-                               (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t (lambda (a b) nil))
+                               (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t (when (stringp palette-id) (lambda (a b) nil)))
                                ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
                                )))))
                (symbols (loop for i from 0 upto (length colors) collect (prin1-to-string i))))
@@ -350,12 +358,14 @@
                (save-excursion
                  (goto-char (point-min))
                  (let ((case-fold-search nil))
-                   (while (re-search-forward (pixel-regex :bitmap t :quick t) nil t)
-                     (let ((overlays (overlays-at (point))))
-                       (dolist (ov overlays)
-                         (let ((editor (overlay-get ov 'pixel-editor)))
-                           (when editor
-                             (add-to-list 'result editor))))))))))
+                   (condition-case nil
+                       (while (re-search-forward (pixel-regex :bitmap t :quick t) nil t)
+                         (let ((overlays (overlays-at (point))))
+                           (dolist (ov overlays)
+                             (let ((editor (overlay-get ov 'pixel-editor)))
+                               (when editor
+                                 (add-to-list 'result editor))))))
+                     (error nil))))))
     result))
 
 (defun* pixel-list-bitmap (&key (buffer nil) (list-origin nil))
