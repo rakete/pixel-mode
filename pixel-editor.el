@@ -767,9 +767,11 @@
                                                                                            (mapcar #'prin1-to-string
                                                                                                    (pixel-color-name-to-rgb new-type (condition-case nil (elt (plist-get palette :colors) (elt new-array i)) (error default))))
                                                                                            comma)))))
-                                                              (concat color (when (and (eq w new-width) (< h (1- new-height))) "\n"))))
+                                                              (concat color
+                                                                      (unless (eq i (1- (* new-width new-height))) (replace-regexp-in-string "[ \t]*" "" comma))
+                                                                      (when (and (eq w new-width) (< h (1- new-height))) "\n"))))
                                               " ")))
-            (replace-match new-array-string t nil nil 9)))
+            (replace-match (concat  new-array-string "\n") t nil nil 9)))
         (pixel-canvas-refresh editor)
         ))))
 
