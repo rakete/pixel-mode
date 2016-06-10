@@ -289,7 +289,7 @@
                 'pixel-buffer-cache
                 :id "pixel-buffers"))
 
-(defvar pixel-palettes-directory (concat emacs-directory "/pixel-mode/palettes"))
+(defvar pixel-palettes-directory (concat user-emacs-directory "pixel-mode/palettes"))
 
 (defun* pixel-find-palette (&key (id nil) (bitmap nil) (marker nil) (origin nil) (find-origin nil))
   (when (and (pixel-bitmap-p bitmap)
