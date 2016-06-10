@@ -47,7 +47,7 @@
                      ;; search for 4:types, if any, then search for c-style array indicator, getting 5:width, 6:height and optionally 7:number of components
                      "\\(?:.*\n\\)*?.*\\(\\[\\|\(\\|\{\\)" "[ \t\n]*?"
                      ;; 8:open
-                     "\\(\\(?:[ \t/\*;#%]*\\(?:[0-9\\.]+\\|[0-9]+\\)\\(?:[ \t,]*\\)?\n?\\)+\\)"
+                     "\\(\\(?:[ \t/\*;#%]*\\(?:[0-9\\.]+\\|[0-9]+\\)\\(?:[ \t,f]*\\)?\n?\\)+\\)"
                      ;; 9:array
                      ))))
     (concat quick-re full-re)))
