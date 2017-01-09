@@ -4,15 +4,14 @@
 
 (require 'pixel-editor nil 'noerror)
 
-(setq pixel-types-regex "\\(int\\|float\\)")
-
 (defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
   (unless mm
     (setq mm major-mode))
   (unless (or palette bitmap)
     (setq palette t
           bitmap t))
-  (let* ((palette-id (or (and (stringp palette) palette) "[^\t\n]+"))
+  (let* ((pixel-types-regex "\\(?:u\\|GL\\)\\(int\\|float\\)\\(?:8_t\\|16_t\\|32_t\\|64_t\\|max_t\\|ptr_t\\|_least8_t\\|_least16_t\\|_least32_t\\|_least64_t\\|_fast8_t\\|_fast16_t\\|_fast32_t\\|_fast64_t\\)")
+         (palette-id (or (and (stringp palette) palette) "[^\t\n]+"))
          (init (cond ((or (stringp palette) (and palette bitmap)) "\\(?:\\<palette\\>\\|\\<bitmap\\>\\)")
                      (palette "\\<palette\\>")
                      (bitmap "\\<bitmap\\>")))
