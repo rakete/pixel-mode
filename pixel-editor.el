@@ -414,6 +414,12 @@
         (pixel-editor-put editor :editor-indentation 20)
         (dolist (key pixel-editor-overlays)
           (cond ((eq :ov-complete key)
+                 (when (eq last-pos (point-max))
+                   (let ((modified-state (buffer-modified-p)))
+                     (save-excursion
+                       (goto-char last-pos)
+                       (insert "\n")
+                       (set-buffer-modified-p modified-state))))
                  (setq ov-complete (make-overlay first-pos (+ last-pos 1)))
                  (setq editor (plist-put editor :ov-complete ov-complete)))
                 ((eq :ov-editor key)
