@@ -475,7 +475,8 @@
     (clrhash pixel-global-palette-cache)
     (clrhash pixel-global-buffer-cache)))
 
-(defadvice save-buffer (around pixel-save-buffer-advice last activate)
+;; around pixel-save-buffer-advice last activate
+(defun pixel-save-buffer (orig-fun &rest args)
   (let ((editor-list (pixel-list-editor :buffer (current-buffer))))
     (if (and (buffer-modified-p)
              editor-list)
@@ -490,7 +491,7 @@
             (with-current-buffer buffer
               (set-visited-file-name visited-file t t)
               ;;(save-buffer)
-              ad-do-it
+              (apply orig-fun args)
               (let ((process (get-buffer-process (current-buffer))))
                 (when process (delete-process process)))
               (kill-buffer))
@@ -498,17 +499,10 @@
             (clear-visited-file-modtime)
             (set-buffer-modified-p nil)))
       ;;(save-buffer)
-      ad-do-it)))
+      (apply orig-fun args))))
 
-;;(ad-unadvise 'save-buffer)
-
-;; (ad-add-advice 'save-buffer '(pixel-save-buffer-advice
-;;                               nil
-;;                               t
-;;                               (lambda () (pixel-save-other-buffer)))
-;;                'around
-;;                'last)
-;; (ad-activate 'save-buffer)
+(with-eval-after-load "pixel-mode"
+  (advice-add 'save-buffer :around #'pixel-save-buffer))
 
 (define-minor-mode pixel-mode
   "Create pixel art right inside your programming buffers"
