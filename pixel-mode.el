@@ -170,6 +170,20 @@ referenced by another bitmap in its \"using\" clause.
             "\\(þ\\)?\\(þ\\)?\\(þ\\)?\\(þ\\)?\\(þ\\)?\\(þ\\)?\\(þ\\)?"
             "\\(\\(?:[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[^\n]*\n*\\)+\\)")))
 
+(defun* pixel-print-match (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
+  (interactive)
+  (when (thing-at-point-looking-at (print (pixel-regex :bitmap bitmap :palette palette :id id :quick quick :mm mm)))
+    (message "%s %s %s %s %s %s %s %s\n%s"
+             (match-string 1)
+             (match-string 2)
+             (match-string 3)
+             (match-string 4)
+             (match-string 5)
+             (match-string 6)
+             (match-string 7)
+             (match-string 8)
+             (match-string 9))))
+
 (defun* pixel-verify-match (&key (bitmap nil) (palette nil) (id nil) (match nil))
   (and (match-string 0 match)
        (> (length (match-string 0 match)) 0)
