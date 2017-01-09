@@ -625,6 +625,7 @@ referenced by another bitmap in its \"using\" clause.
 (with-eval-after-load "pixel-mode"
   (advice-add 'save-buffer :around #'pixel-save-buffer))
 
+;;;###autoload
 (define-minor-mode pixel-mode
   "Create pixel art right inside your programming buffers"
   :lighter " Pixel"
