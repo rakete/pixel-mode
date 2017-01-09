@@ -542,16 +542,6 @@ referenced by another bitmap in its \"using\" clause.
               (puthash key (apply fn args) (eval cache))))
         (apply fn args))))
 
-;; (defun* test-foo (&key (id nil))
-;;   23)
-
-;; (let ((bar2 "foo"))
-;;   (test-foo nil))
-
-;; (let ((test-cache (make-hash-table :test 'equal)))
-;;   (pixel-cached 'test-foo 'test-cache :id "bar")
-;;   (print (gethash "bar" test-cache)))
-
 (defun* pixel-toggle-editor (&key (id nil) (marker nil) (origin nil) (remove-active t))
   (interactive)
   (unless (pixel-origin-p origin)
