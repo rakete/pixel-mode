@@ -1,15 +1,36 @@
-;; -*- lexical-binding: t -*-
+;;; pixel-editor.el --- Minor mode for drawing pixel art -*- lexical-binding: t -*-
 
-;; Local variables:
-;; byte-compile-warnings: (not cl-functions)
-;; End:
+;; xxxLocal variables:
+;; xxxbyte-compile-warnings: (not cl-functions)
+;; xxxEnd:
 
+;; Copyright (C) 2014-2017 Andreas Raster
+
+;; This file is part of pixel-mode.
+
+;; pixel-mode is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; pixel-mode is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with pixel-mode.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Nothing so far
+
+;;; Code:
 (require 'pixel-bitmap nil 'noerror)
 
 ;;
 ;; Utilities
 ;;
-
 (defun* pixel-find-index (x xs &key (test 'eq))
   (let ((n 0)
         (found nil))
@@ -1020,3 +1041,5 @@
   map)
 
 (provide 'pixel-editor)
+
+;;; pixel-editor.el ends here
