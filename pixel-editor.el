@@ -76,7 +76,7 @@
 ;;
 ;; State
 ;;
-(setq pixel-editor-state (make-hash-table :test 'equal))
+(defvar pixel-editor-state (make-hash-table :test 'equal))
 
 (defun pixel-editor-put (editor prop &optional val)
   (or (and (plist-get editor prop)
