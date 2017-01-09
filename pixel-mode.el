@@ -237,7 +237,14 @@
                              (let ((r (nth (+ (* i stride) 0) numbers))
                                    (g (nth (+ (* i stride) 1) numbers))
                                    (b (nth (+ (* i stride) 2) numbers)))
-                               (add-to-list 'colors (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b))) t (when (stringp palette-id) (lambda (a b) nil)))
+                               (add-to-list 'colors
+                                            (apply 'color-rgb-to-hex (pixel-normalize-color type (list r g b)))
+                                            t
+                                            ;; why am I setting the compare-fn to nil if palette-id is stringp?
+                                            ;; 'equal makes duplicate colors go away
+                                            (if (stringp palette-id)
+                                                (lambda (a b) nil)
+                                              'equal))
                                ;; (setq colors (append colors (list (color-rgb-to-hex r g b))))
                                )))))
                (symbols (loop for i from 0 upto (length colors) collect (prin1-to-string i))))
