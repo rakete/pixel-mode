@@ -5,8 +5,118 @@
 (require 'pixel-editor nil 'noerror)
 
 (defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
+  "Central part of pixel-mode is matching array definitions
+in various programming languages, that represent either
+bitmaps or palettes, with a regular expression. This
+function creates such a regular expression, fitting the
+programming major mode that is currently active.
+
+The regular expression that is returned can be customized
+with the following parameters to this function:
+
+- BITMAP and PALETTE control whether you want to match an
+  array representing a bitmap or a palette, if none is set
+  this function assumes you want to match both, if either
+  of BITMAP or PALETTE is set to t, it only matches the
+  corresponding array. Additionally you can set palette to
+  a string of a palette id to match only those bitmaps
+  using that palette id.
+- ID can be a specific id of either a palette or bitmap,
+  to match only those that have that id
+- QUICK produces a faster to match regular expression in
+  case you only want to match the header of a bitmap or
+  palette and don't care about the whole array
+- MM can be used to force this function to assume a specific
+  major-mode
+
+The returned regular expression contains several groups
+that can be used to extract specific information about
+the matched bitmap or palette. These are as follows:
+
+1. Should be the id of the matched bitmap or palette.
+2. If the matched array is a bitmap, this should be the
+   id of the palette this bitmap uses, or nothing otherwise.
+   This is an optional group.
+3. Format of the image tuples either \"rgb\" or \"rgba\", if
+   the bitmap uses a palette this can be ignored. This is an
+   optional group.
+4. The type of the image tuples, this may be something like
+   \"int\" or \"float\". This is an optional group.
+5. The width of the bitmap. This is an optional group.
+6. The height of the bitmap. This is an optional group.
+7. The number of components per pixel. This is an optional
+   group.
+8. The opening parenthesis before the array. Like \"(\" or
+   \"{\". This is an optional group.
+9. The actual array containing the bitmap pixel, or palette
+   colors as either indices into an palette, or as color
+   tuples.
+
+Here is an example that demonstrates what a regular
+expression produced by this function can match. These are
+two C arrays representing a palette and a bitmap.
+
+First the array representing a palette:
+
+// palette: default_font_palette
+// format: rgb
+uint8_t global_default_font_palette[1*9*3] = {
+    0,   0,   0,
+    255, 255, 255,
+    0,   0,   0,
+    255,   0,   0,
+    0, 255,   0,
+    0,   0, 255,
+    255, 255,   0,
+    0, 255, 255,
+    230,   0, 150
+};
+
+Notice the first two commented lines, which identify this
+array as a palette with id \"default_font_palette\" with the
+format \"rgb\" for the color tuples. Since this is a C array
+there is a type identifier \"uint8_t\" and the numbers in
+the array brackets \"[1*9*3]\" can be matched as width=1,
+height=9 and components=3.
+
+Second the array representing a bitmap:
+
+// bitmap: char_A
+// using: default_font_palette
+static int32_t pixels[6*7] = {
+    0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 0, 0,
+    0, 1, 0, 0, 1, 0,
+    0, 1, 1, 1, 1, 0,
+    0, 1, 0, 0, 1, 0,
+    0, 1, 0, 0, 1, 0,
+    0, 0, 0, 0, 0, 0
+};
+
+Again two commented lines identify this array as bitmap
+with id \"char_A\" using the palette \"default_font_palette\".
+There is a type \"int32_t\" to match and the brackets
+\"[6*7]\" can be matched as width=6 and height=7.
+
+The above is also an example of a bitmap that uses indices
+into a palette as pixels. It is also possible to have a
+bitmap use rgb tuples as shown below.
+
+// bitmap: bitmap_palette
+static uint32_t pixels[2*2] = {
+    255, 0, 0, 0, 0, 255,
+    0, 0, 255, 255, 0, 0
+};
+
+A bitmap like that acts as its own palette, and can also be
+referenced by another bitmap in its \"using\" clause.
+"
   (unless mm
     (setq mm major-mode))
+  ;; both bitmap and palette have nil as default value so that setting either to true results
+  ;; in the other still being nil, but if none of them is set, I actually want this function
+  ;; to assume that both bitmap and palette should be matched, so I have to set both to true
+  ;; manually in that case
   (unless (or palette bitmap)
     (setq palette t
           bitmap t))
