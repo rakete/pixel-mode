@@ -1,4 +1,46 @@
+;;; pixel-mode.el --- Minor mode for drawing pixel art
 
+;; Copyright (C) 2014-2017 Andreas Raster
+
+;; Author: Andreas Raster <lazor@affenbande.org>
+;; Version: 0
+;; Keywords: games, multimedia, convenience, pixelart, drawing, pixel, art
+;; Package-Requires: ((emacs "24.4"))
+;; URL: https://github.com/rakete/pixel-mode
+
+;; This file is part of pixel-mode.
+
+;; pixel-mode is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; pixel-mode is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with pixel-mode.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; A minor mode for drawing pixel art inside emacs buffers. This makes
+;; it possible to easily create programming language arrays representing
+;; bitmaps visually. They can be drawn with the mouse right inside an
+;; emacs buffer, making this mode a very convenient tool to quickly
+;; create icons or other small 'programmer art'.
+
+;; This file contains the code to deal with matching arrays as bitmaps
+;; or palettes and reading them into the appropriate data structures,
+;; plus various ways to verify regular expression matches and deduce
+;; information from them.
+;; It contains the code that deals with managing editors inside buffers,
+;; enabling, disabling and finding them. Associating the right palette
+;; with the right bitmap.
+;; And saving buffers while pixel editors are active.
+
+;;; Code:
 (require 'cl)
 (require 'color)
 
@@ -648,3 +690,5 @@ referenced by another bitmap in its \"using\" clause.
         (pixel-toggle-editor :origin origin)))))
 
 (provide 'pixel-mode)
+
+;;; pixel-mode.el ends here
