@@ -149,9 +149,6 @@
           :close "]"
           :type "int")))
 
-(defun* pixel-copy-bitmap (bitmap &rest keys)
-  )
-
 ;; (let ((foo (pixel-make-bitmap)))
 ;;   (pixel-bitmap-set foo 2 3 2)
 ;;   (pixel-bitmap-ref foo 2 3))
