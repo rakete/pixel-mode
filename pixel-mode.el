@@ -21,12 +21,12 @@
          (id (if id
                  (regexp-quote id)
                "[^ \t\n]+"))
-         (quick-re (concat "^[ \t/\*;#%]*" init ":[ \t]*\\(" id "\\)\n"
+         (quick-re (concat "^[ \t/\*;#%-]*" init ":[ \t]*\\(" id "\\)\n"
                            ;; comment   palette|bitmap   1:specific or any name
-                           "\\(?:[ \t/\*;#%]*using:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
+                           "\\(?:[ \t/\*;#%-]*using:[ \t]*\\(" palette-id "\\)" "[ \t\n]+" "\\)" palette-optional
                            ;; comment, 2:specific or any palette name when init=bitmap, whole thing may be optional
                            ;; a bitmap without a palette param can be itself a palette, when it has colors packed in (rgb triples)
-                           "\\(?:[ \t/\*;#%]*format:[ \t]*\\(" "[^ \t\n]+" "\\)" "[ \t\n]+" "\\)?"
+                           "\\(?:[ \t/\*;#%-]*format:[ \t]*\\(" "[^ \t\n]+" "\\)" "[ \t\n]+" "\\)?"
                            ;; 3:format of the image (rgba or rgb, defaults to rgb)
                            ))
          (full-re (unless quick
@@ -46,7 +46,7 @@
                      ;; search for 4:types, if any, then search for c-style array indicator, getting 5:width, 6:height and optionally 7:number of components
                      "\\(?:.*\n\\)*?.*\\(\\[\\|\(\\|\{\\)" "[ \t\n]*?"
                      ;; 8:open
-                     "\\(\\(?:[ \t/\*;#%]*\\(?:[0-9\\.]+\\|[0-9]+\\)\\(?:[ \t,f]*\\)?\n?\\)+\\)"
+                     "\\(\\(?:[ \t/\*;#%-]*\\(?:[0-9\\.]+\\|[0-9]+\\)\\(?:[ \t,f]*\\)?\n?\\)+\\)"
                      ;; 9:array
                      ))))
     (concat quick-re full-re)))
