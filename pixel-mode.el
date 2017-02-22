@@ -663,7 +663,7 @@ nothing yet associated with the key in the hash-table."
                         (pixel-find-bitmap :id id :find-origin t))
                        ((markerp marker)
                         (pixel-find-bitmap :marker marker :find-origin t))
-                       ((eq major-mode 'pixel-mode)
+                       ((some (lambda (m) (eq m 'pixel-mode)) minor-mode-list)
                         (pixel-find-bitmap :marker (set-marker (make-marker) (point)) :find-origin t)))))
   (let ((editor (pixel-find-editor :origin origin))
         (modified-state (buffer-modified-p)))
