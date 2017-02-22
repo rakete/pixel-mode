@@ -204,6 +204,8 @@ referenced by another bitmap in its \"using\" clause.
     (concat quick-re full-re)))
 
 (defun* pixel-gimp-palette-regex (&key (id nil))
+  "A helper function that creates a regex for matching a GIMP palette.
+This works just like `pixel-regex', but only matches GIMP palettes."
   (let* ((palette-id (or (and (stringp id) id) "[^\t\n]+")))
     (concat "^GIMP Palette[ \t\n]*"
             "Name:[ \t]*\\(" palette-id "\\)[ \t\n]*"
@@ -213,6 +215,7 @@ referenced by another bitmap in its \"using\" clause.
             "\\(\\(?:[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[^\n]*\n*\\)+\\)")))
 
 (defun* pixel-print-match (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
+  "After matching a `pixel-regex', this just prints all group matches."
   (interactive)
   (when (thing-at-point-looking-at (print (pixel-regex :bitmap bitmap :palette palette :id id :quick quick :mm mm)))
     (message "%s %s %s %s %s %s %s %s\n%s"
@@ -227,20 +230,40 @@ referenced by another bitmap in its \"using\" clause.
              (match-string 9))))
 
 (defun* pixel-verify-match (&key (bitmap nil) (palette nil) (id nil) (match nil))
+  "Try to verify if a `pixel-regex' match is a valid bitmap or palette."
   (and (match-string 0 match)
        (> (length (match-string 0 match)) 0)
        (if (stringp id) (string-equal (match-string 1 match) id) t)))
 
 (defun pixel-mapx (x f xs)
+  "Given a list XS, apply function F to the index and X elements from the list.
+So for example (pixel-mapx 3 f '(a b c)) calls function f like this (f 0 a b c)
+once.
+
+I also like to call X the stride."
   (when (< x 1)
     (setq x 1))
   (let ((steps (ceiling (/ (float (length xs)) (float x)))))
     (loop for n from 0 below steps
           collect (apply f n (subseq xs (* n x) (+ (* n x) x))))))
 
-;; (pixel-mapx 2 (lambda (&rest args) (print args)) '(1 2 3 4 5 6 7 8 9 10))
+;; (pixel-mapx 4 (lambda (index &rest args) (print (format "%d: %S" index args))) '(1 2 3 4 5 6 7 8))
 
 (defun pixel-find-comma (source)
+  "This tries to determine the comma character from a SOURCE text. A source text is just
+the portion of a bitmap or palette definition that defines the actual bitmap or palette,
+so the array that has the pixels in it. So in something like this:
+
+int foo[3] = {
+    1, 2, 3,
+    4, 5, 6,
+    7, 8, 9
+};
+
+The 1,2,3,4,5,6,7,8,9 part is what you would pass as SOURCE text to this function.
+
+Then this function looks if there is a comma or nothing between the digits of the
+source text with a regex."
   (save-match-data
     (string-match "^[^0-9\\.]*[0-9\\.]+\\([^0-9\\.]+\\)[0-9\\.]+.*" source)
     (condition-case nil (match-string 1 source) (error ","))))
@@ -248,6 +271,12 @@ referenced by another bitmap in its \"using\" clause.
 ;; (pixel-find-comma ";; { 0, 0, 0, 0, 0, 0, 0")
 
 (defun pixel-find-width (source &optional comma)
+  "This tries to determine the bitmap width of a SOURCE text by counting the amount of commas
+in the first line.
+
+Can be forced to used a certain string as comma with an optional COMMA argument.
+
+See also `pixel-find-comma' for details on what a source text is."
   (save-match-data
     (let ((comma-re (concat "[" (regexp-quote (remove-duplicates (or comma (pixel-find-comma source)))) "]")))
       (string-match (concat "^[^0-9\\.]*\\(\\(?:[0-9\\.]+" comma-re "*\\)+\\)") source)
@@ -256,12 +285,17 @@ referenced by another bitmap in its \"using\" clause.
 ;; (pixel-find-width ";; 0 , 0 , 0 , 0 , 0 ,  |0 0 0 0 0")
 
 (defun pixel-find-height (source)
+  "Determine height of bitmap by counting lines in SOURCE text.
+
+See also `pixel-find-comma' for details on what a source text is."
   (save-match-data
     (length (split-string source "\n" t))))
 
 ;; (pixel-find-height ";; 0 , 0 , 0 , 0 , 0 ,  \n0 0 0 0 0")
 
 (defun pixel-find-type (numbers)
+  "Given some NUMBERS, determine if those are floats or ints. Even if just one number is
+a float, this will return float, otherwise it returns int."
   (if (some 'floatp numbers)
       "float"
     "int"))
@@ -269,6 +303,14 @@ referenced by another bitmap in its \"using\" clause.
 ;; (pixel-find-type '(0 0 0 0 0.1))
 
 (defun pixel-read-bitmap (&optional marker)
+  "This function uses the groups from `pixel-regex' to read a bitmap into a plist. It can
+be applied to specific region of a buffer by supplying a MARKER, otherwise it will just
+assume that there is a bitmap to match at the current point.
+
+It returns two plists, one for the bitmap and one describing the origin where the bitmap
+was matched, like the which buffer, location in the buffer, etc.
+
+See also `pixel-read-palette'."
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -351,6 +393,9 @@ referenced by another bitmap in its \"using\" clause.
                                      :buffer (current-buffer))))))))
 
 (defun pixel-find-stride (source &optional comma)
+  "Given a SOURCE text, determine the stride to use with `pixel-mapx'.
+
+See also `pixel-find-comma' for details on what a source text is."
   (let ((w (pixel-find-width source comma)))
     (cond ((eq (mod w 3) 2)
            4)
@@ -360,6 +405,7 @@ referenced by another bitmap in its \"using\" clause.
            3))))
 
 (defun pixel-read-palette (&optional marker)
+  "Same as `pixel-read-bitmap' but this reads a palette instead."
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -435,6 +481,7 @@ referenced by another bitmap in its \"using\" clause.
                                       :buffer (current-buffer))))))))
 
 (defun pixel-origin-p (origin)
+  "Test if a plist ORIGIN is a origin as returned by either `pixel-read-bitmap' or `pixel-read-palette'."
   (when (and (listp origin)
              (plist-get origin :id)
              (plist-get origin :beginning)
@@ -443,9 +490,11 @@ referenced by another bitmap in its \"using\" clause.
     origin))
 
 (defun pixel-origin-marker (origin)
+  "Given ORIGIN make a marker for it."
   (set-marker (make-marker) (plist-get origin :beginning) (plist-get origin :buffer)))
 
 (defun* pixel-list-buffer ()
+  "List all buffers that contain a bitmap or palette that can be matched with `pixel-regex'."
   (pixel-cached (lambda (&rest args)
                   (let ((result '()))
                     (loop for buf in (buffer-list)
@@ -461,9 +510,20 @@ referenced by another bitmap in its \"using\" clause.
                 'pixel-buffer-cache
                 :id "pixel-buffers"))
 
-(defvar pixel-palettes-directory (concat (file-name-directory (or load-file-name buffer-file-name)) "palettes"))
+(defvar pixel-palettes-directory
+  (concat (file-name-directory (or load-file-name buffer-file-name)) "palettes")
+  "Directory in which `pixel-mode' searches for palette files.")
 
 (defun* pixel-find-palette (&key (id nil) (bitmap nil) (marker nil) (origin nil) (find-origin nil))
+  "Find specific palette. Given an ID find a matching palette, given an BITMAP find the palette that
+matches the bitmaps palette id, given a MARKER find a palette at that marker, given an ORIGIN find a
+palette at a marker created from that origin.
+
+Set FIND-ORIGIN to make this function return the origin instead of the palette.
+
+This will also search `pixel-palettes-directory' for matching palettes.
+
+Uses `pixel-list-buffer' to search a list of buffers for palettes."
   (when (and (pixel-bitmap-p bitmap)
              (setq id (plist-get bitmap :palette-id))))
   (let* ((id-regex (when id (concat "^" (replace-regexp-in-string "[ \t\n]" "." (regexp-quote id)))))
@@ -500,6 +560,7 @@ referenced by another bitmap in its \"using\" clause.
 ;; (pixel-find-palette :bitmap (pixel-find-bitmap :id "test1"))
 
 (defun* pixel-find-bitmap (&key (id nil) (marker nil) (origin nil) (find-origin nil))
+  "Find specific bitmap. Like `pixel-find-palette' but for bitmaps."
   (cond ((markerp marker)
          (plist-get (pixel-read-bitmap marker) (if find-origin :bitmap-origin :bitmap)))
         ((pixel-origin-p origin)
@@ -523,6 +584,7 @@ referenced by another bitmap in its \"using\" clause.
                  result)))))))
 
 (defun* pixel-list-editor (&key (buffer nil))
+  "List all active editors, use BUFFER argument to force searching through one single buffer."
   (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))
         (result '()))
     (loop for buf in buffers
@@ -541,6 +603,7 @@ referenced by another bitmap in its \"using\" clause.
     result))
 
 (defun* pixel-list-bitmap (&key (buffer nil) (list-origin nil))
+  "List all bitmaps. Force with BUFFER to search single buffer, use LIST-ORIGIN to list bitmap origins instead."
   (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))
         (result '()))
     (loop for buf in buffers
@@ -560,6 +623,7 @@ referenced by another bitmap in its \"using\" clause.
     result))
 
 (defun* pixel-find-editor (&key (id nil) (point nil) (origin nil) (find-origin nil))
+  "Find specific editor. Like `pixel-find-palette' but for editors."
   (let ((ovs (cond ((numberp point)
                     (overlays-at point))
                    ((pixel-origin-p origin)
@@ -576,6 +640,13 @@ referenced by another bitmap in its \"using\" clause.
     editor))
 
 (defun pixel-cached (fn cache &rest args)
+  "This takes a function FN and a symbol CACHE and then uses CACHE to store the result
+of FN or return an previously stored result.
+
+To do that it assumes that ARGS is a plist with an :id, :origin or :bitmap that it can
+use as key. It then treats CACHE like a hash-table and either returns the value associated
+with the key in the hash-table, or stores the result of FN in the hash-table if there
+nothing yet associated with the key in the hash-table."
   (let ((key (or (plist-get args :id)
                  (plist-get (plist-get args :origin) :id)
                  (plist-get (plist-get args :bitmap) :palette-id))))
@@ -585,6 +656,7 @@ referenced by another bitmap in its \"using\" clause.
         (apply fn args))))
 
 (defun* pixel-toggle-editor (&key (id nil) (marker nil) (origin nil) (remove-active t))
+  "Toggle a pixel-mode editor between visible and invisible state."
   (interactive)
   (unless (pixel-origin-p origin)
     (setq origin (cond ((stringp id)
@@ -611,32 +683,32 @@ referenced by another bitmap in its \"using\" clause.
         (set-buffer-modified-p modified-state)
         editor))))
 
-(defvar pixel-restore-editor-after-save-list '())
+;; (defvar pixel-restore-editor-after-save-list '())
 
-(defvar pixel-global-bitmap-cache (make-hash-table :test 'equal))
-(defvar pixel-global-palette-cache (make-hash-table :test 'equal))
-(defvar pixel-global-buffer-cache (make-hash-table :test 'equal))
+;; (defvar pixel-global-bitmap-cache (make-hash-table :test 'equal))
+;; (defvar pixel-global-palette-cache (make-hash-table :test 'equal))
+;; (defvar pixel-global-buffer-cache (make-hash-table :test 'equal))
 
-(defun pixel-before-save ()
-  (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
-        (pixel-palette-cache pixel-global-palette-cache)
-        (pixel-buffer-cache pixel-global-buffer-cache))
-    (dolist (editor (pixel-list-editor :buffer (current-buffer)))
-      ;;(pixel-editor-save editor)
-      (pixel-editor-remove editor)
-      (add-to-list 'pixel-restore-editor-after-save-list (plist-get editor :id)))))
+;; (defun pixel-before-save ()
+;;   (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
+;;         (pixel-palette-cache pixel-global-palette-cache)
+;;         (pixel-buffer-cache pixel-global-buffer-cache))
+;;     (dolist (editor (pixel-list-editor :buffer (current-buffer)))
+;;       ;;(pixel-editor-save editor)
+;;       (pixel-editor-remove editor)
+;;       (add-to-list 'pixel-restore-editor-after-save-list (plist-get editor :id)))))
 
-(defun pixel-after-save ()
-  (when pixel-restore-editor-after-save-list
-    (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
-          (pixel-palette-cache pixel-global-palette-cache)
-          (pixel-buffer-cache pixel-global-buffer-cache))
-      (dolist (id pixel-restore-editor-after-save-list)
-        (pixel-toggle-editor :id id)))
-    (setq pixel-restore-editor-after-save-list '())
-    (clrhash pixel-global-bitmap-cache)
-    (clrhash pixel-global-palette-cache)
-    (clrhash pixel-global-buffer-cache)))
+;; (defun pixel-after-save ()
+;;   (when pixel-restore-editor-after-save-list
+;;     (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
+;;           (pixel-palette-cache pixel-global-palette-cache)
+;;           (pixel-buffer-cache pixel-global-buffer-cache))
+;;       (dolist (id pixel-restore-editor-after-save-list)
+;;         (pixel-toggle-editor :id id)))
+;;     (setq pixel-restore-editor-after-save-list '())
+;;     (clrhash pixel-global-bitmap-cache)
+;;     (clrhash pixel-global-palette-cache)
+;;     (clrhash pixel-global-buffer-cache)))
 
 ;; around pixel-save-buffer-advice last activate
 (defun pixel-save-buffer (orig-fun &rest args)
