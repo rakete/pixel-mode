@@ -47,7 +47,9 @@
 (require 'pixel-editor nil 'noerror)
 
 (defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
-  "Central part of pixel-mode is matching array definitions
+  "Build regular expression for matching pixel-mode bitmaps.
+
+Central part of pixel-mode is matching array definitions
 in various programming languages, that represent either
 bitmaps or palettes, with a regular expression. This
 function creates such a regular expression, fitting the
@@ -230,7 +232,7 @@ This works just like `pixel-regex', but only matches GIMP palettes."
              (match-string 9))))
 
 (defun* pixel-verify-match (&key (bitmap nil) (palette nil) (id nil) (match nil))
-  "Try to verify if a `pixel-regex' match is a valid bitmap or palette."
+  "Try to verify if the last regular expression match has correctly matched a pixel-regex bitmap or palette."
   (and (match-string 0 match)
        (> (length (match-string 0 match)) 0)
        (if (stringp id) (string-equal (match-string 1 match) id) t)))
