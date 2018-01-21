@@ -44,7 +44,8 @@
 (require 'cl)
 (require 'color)
 
-(require 'pixel-editor nil 'noerror)
+(require 'pixel-bitmap)
+(require 'pixel-editor)
 
 (defun* pixel-regex (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
   "Build regular expression for matching pixel-mode bitmaps.

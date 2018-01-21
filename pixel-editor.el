@@ -23,7 +23,32 @@
 
 ;;; Commentary:
 
-;; Nothing so far
+;; This file contains the user interface code of pixel-mode. An editor
+;; is what pixel-mode calls such an user interface: a gui displayed inside
+;; of an emacs buffer that can be used like an image manipulation program
+;; to modify/create pixel art.
+;; Here you'll find functionality for creating and updating the editor
+;; gui, for synchronizing the editor state with the array in the buffer
+;; and for reacting to user input by mouse and keyboard. Editors are
+;; implemented using overlays and rely heavily on the feature that emacs
+;; can display overlay text in a buffer without it actually being inserted
+;; into the file.
+
+;; At the very least an editor should contain a canvas, which is a visual
+;; representation of the array this editor is used to modify (in other words,
+;; the canvas shows the picture that is edited). But it may also have a
+;; palette to pick colors from, a toolbar which has buttons for editor
+;; tools and shortcuts to colors/tools and a section which displays the
+;; edited array as text. What gui elements an editor contains and in what
+;; order those elements appear in the buffer is customizable by the user.
+
+;; Input from the user is handled via keymaps that are only active as long
+;; as the cursor is within the editor. These keymaps define actions that
+;; change the editor state, for example when changing the active tool, or
+;; resizing the canvas. They also define motions to handle mouse input so
+;; that the user can use the mouse to draw lines and rectangles by dragging,
+;; and they define keypresses as a way to draw with the keyboard instead
+;; of using the mouse.
 
 ;;; Code:
 (require 'pixel-bitmap nil 'noerror)
