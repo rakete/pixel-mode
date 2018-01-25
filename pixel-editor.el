@@ -56,21 +56,6 @@
 ;;
 ;; Utilities
 ;;
-(defun* pixel-find-index (x xs &key (test 'eq))
-  (let ((n 0)
-        (found nil))
-    (while (and (< n (length xs))
-                (not found))
-      (setq found (funcall test (nth n xs) x))
-      (unless found
-        (setq n (1+ n))))
-    (when found n)))
-
-;; (pixel-find-index "foo" '("bar" "foo") :test 'string-equal)
-
-(defun pixel-make-image (&rest keys)
-  (find-image (list keys)))
-
 (defvar pixel-hover-face-cache (make-hash-table :test 'equal))
 
 (defun pixel-make-hover-face (id x y)
@@ -100,10 +85,10 @@
   (let ((key (format "%d%d%s" width (or height width) color)))
     (append (list 'image) (cdr (or (gethash key pixel-pixel-cache nil)
                                    (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width)))))
-                                         (pixel-make-image :type 'xpm
-                                                           :data template
-                                                           :color-symbols `(("col0"  . ,color))
-                                                           :height (or height width)))
+                                                  (find-image (list :type 'xpm
+                                                                    :data template
+                                                                    :color-symbols `(("col0"  . ,color))
+                                                                    :height (or height width)) ))
                                             pixel-pixel-cache))))))
 
 ;; (defun pixel-map-text-properties (start end props f &optional buffer)
