@@ -56,10 +56,18 @@
 ;;
 ;; Utilities
 ;;
-(defvar pixel-hover-face-cache (make-hash-table :test 'equal))
+(defvar pixel-hover-face-cache (make-hash-table :test 'equal)
+  "Used for caching the faces that are used when the mouse hovers over a pixel.
 
-(defun pixel-make-hover-face (id x y)
-  (let ((name (format "%s|%d|%d" id x y)))
+See also `pixel-pixel-cache' and `pixel-make-hover-face'.")
+
+(defun pixel-make-hover-face (id)
+  "Make a face that is supposed to be used for when the mouse hovers over a pixel.
+
+Use with the 'mouse-face property.
+
+The ID is used for caching the created face in `pixel-hover-face-cache'."
+  (let ((name (format "%s" id)))
     (or (gethash name pixel-hover-face-cache nil)
         (puthash name
                  (let* ((sym (intern name))
@@ -69,19 +77,22 @@
                    face)
                  pixel-hover-face-cache))))
 
-;; (defun pixel-copy-hover-face (face &optional hex x y)
-;;   (print (face-attribute face :box t 'default))
-;;   (let* ((sym (intern (cond ((and x y)
-;;                              (replace-regexp-in-string "^.*\\(|[0-9]+|[0-9]+\\)$" (concat "|" (prin1-to-string x) "|" (prin1-to-string y)) (prin1-to-string face) nil nil 1))
-;;                             ((stringp hex)
-;;                              (replace-regexp-in-string "^.*\\(|[0-9a-fA-F]+\\)$" (concat "|" (replace-regexp-in-string "#" "" hex)) (prin1-to-string face) nil nil 1)))))
-;;          (new-face (make-face sym)))
-;;     (set-face-attribute new-face nil :box (print (face-attribute face :box t 'default)))
-;;     new-face))
+(defvar pixel-pixel-cache (make-hash-table :test 'equal)
+  "Hashtable that caches the the xpm images which are used to diplay pixels.
 
-(defvar pixel-pixel-cache (make-hash-table :test 'equal))
+See also `pixel-make-pixel'.")
 
 (defun pixel-make-pixel (color width &optional height)
+  "Create an unicolor image that can be used to represent a single pixel.
+
+Use this with the 'display property.
+
+COLOR specifies what color the pixel should have, WIDTH and optional HEIGHT
+can be used to specify the dimensions (in real pixels) that the pixel image
+is going to have.
+
+See also `pixel-pixel-cache', `pixel-xpm-data', `pixel-make-bitmap' and
+`find-image'."
   (let ((key (format "%d%d%s" width (or height width) color)))
     (append (list 'image) (cdr (or (gethash key pixel-pixel-cache nil)
                                    (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width)))))
@@ -91,32 +102,30 @@
                                                                     :height (or height width)) ))
                                             pixel-pixel-cache))))))
 
-;; (defun pixel-map-text-properties (start end props f &optional buffer)
-;;   (with-current-buffer (or buffer (current-buffer))
-;;     (save-excursion
-;;       (goto-char start)
-;;       (while (< (point) end)
-;;         (forward-char)
-;;         (let ((plist '()))
-;;           (dolist (prop props)
-;;             (setq plist (plist-put plist prop (get-text-property (point) prop))))
-;;           (when (every #'identity plist)
-;;             (setq plist (funcall f (point) plist))
-;;             (add-text-properties (point) (1+ (point)) plist)))))))
-
 ;;
 ;; State
 ;;
-(defvar pixel-editor-state (make-hash-table :test 'equal))
+(defvar pixel-editor-state (make-hash-table :test 'equal)
+  "Hashtable that keep track of each editors state. The keys are editor :ids,
+the values are plists containing things like the currently active tool or the
+selected color of an editor, but also things like the overlays that the editor
+consists of.
+
+See also `pixel-editor-put', `pixel-editor-update' and `pixel-editor-get'.")
 
 (defun pixel-editor-put (editor prop &optional val)
+  "Put a property PROP with a value VAL into the state of EDITOR saved in
+`pixel-editor-state'.
+
+See also `pixel-editor-update', `pixel-editor-get' and `plist-put'."
   (or (and (plist-get editor prop)
            (plist-put editor prop val))
       (let* ((key (plist-get editor :id)))
         (when key
           (if prop
               (puthash key (plist-put (or (gethash key pixel-editor-state)
-                                          (puthash key '() pixel-editor-state)) prop val)
+                                          (puthash key '() pixel-editor-state))
+                                      prop val)
                        pixel-editor-state)
             (puthash key val pixel-editor-state))
           editor))))
@@ -124,6 +133,10 @@
 ;; (pixel-editor-put (list :id "aaa" :foo "lala") :ficken "bar")
 
 (defun pixel-editor-update (editor prop val)
+  "Update poperties PROP with new value VAL in state of EDITOR saved in
+`pixel-editor-state'.
+
+See also `pixel-editor-put', `pixel-editor-get' and `plist-put'."
   (let* ((ov (pixel-editor-get editor :ov-editor))
          (start (overlay-start ov))
          (end (overlay-end ov))
@@ -134,6 +147,11 @@
           (add-text-properties pos (1+ pos) (funcall update-fn val)))))))
 
 (defun pixel-editor-get (editor &optional prop default)
+  "Get poperties PROP value from the state of EDITOR save in `pixel-editor-state'.
+
+If there is no value in the editor state yet, return DEFAULT.
+
+See also `pixel-editor-update', `pixel-editor-put' and `plist-get'."
   (or (plist-get editor prop)
       (let* ((key (plist-get editor :id)))
         (when key
@@ -149,9 +167,15 @@
 ;;
 
 (defun pixel-editor-buffer (editor)
+  "Return the buffer in which EDITOR is displayed.
+
+See also `overlay-buffer'."
   (overlay-buffer (pixel-editor-get editor :ov-complete)))
 
 (defun pixel-editor-insert-toolbar (editor)
+  "Helper function to put a clickable toolbar on an already created EDITOR.
+
+See also `pixel-editor-create', `pixel-editor-insert-palette' and `pixel-editor-insert-canvas'."
   (when editor
     (save-excursion
       (let* ((id (pixel-editor-get editor :id))
@@ -218,6 +242,9 @@
                                   'keymap editor-keymap)))))))))
 
 (defun pixel-editor-insert-palette (editor palette)
+  "Helper function to put a clickable PALETTE on an already created EDITOR.
+
+See also `pixel-editor-create', `pixel-editor-insert-toolbar' and `pixel-editor-insert-canvas'."
   (when (and editor palette)
     (save-excursion
       (let* ((id (pixel-editor-get editor :id))
@@ -262,7 +289,7 @@
                                 'keymap editor-keymap)))
           (let* ((c (nth n colors))
                  (icon (pixel-make-pixel c rowheight))
-                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face" n 0)))
+                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face")))
             (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
                                     (propertize " " 'intangible 'editor)
@@ -280,6 +307,11 @@
         (overlay-put ov 'pixel-color-map color-map)))))
 
 (defun pixel-editor-insert-canvas (editor bitmap palette)
+  "Helper function to put a drawable canvas on an already created EDITOR.
+
+The inserted canvas will display BITMAP using PALETTE.
+
+See also `pixel-editor-create', `pixel-editor-insert-palette' and `pixel-editor-insert-toolbar'."
   (when (and editor bitmap palette)
     (save-excursion
       (let* ((id (pixel-editor-get editor :id))
@@ -312,7 +344,7 @@
                    (c (condition-case nil (elt colors v) (error "#000000")))
                    (a (condition-case nil (elt alphas v) (error 1)))
                    (pixel (pixel-make-pixel c (* zoomlevel 2)))
-                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face" x y)))
+                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face")))
               (insert (propertize (if (eq x (- w 1))
                                       (propertize " " 'intangible 'editor)
                                     (propertize " "))
@@ -337,18 +369,31 @@
                               'keymap editor-keymap))
           (move-overlay ov start (point)))))))
 
-;; (setq pixel-editor-overlays
-;;       '(:ov-complete :ov-source :ov-editor :ov-seperator1 :ov-tools :ov-seperator2 :ov-palette :ov-seperator3 :ov-canvas))
-
-;; (setq pixel-editor-overlays
-;;       '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-canvas))
-
-
-
 (defvar pixel-editor-overlays
-  '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas))
+  '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas)
+  "Customize the order and visibility of editor 'sections'.
+
+Each editor consists of several overlays, one for the part that shows the source code,
+one for the part that contains the canvas, etc. This variable holds keys that identify
+the different sections and can be used to change the order in which the sections are
+inserted into a buffer or to disable a section altogether.
+
+The following keys are looked for specifically by `pixel-editor-create':
+:ov-complete : encompasses the whole editor
+:ov-source : contains only the source code of the edited image
+:ov-editor : the editor with all its toolbars and the canvas
+
+All other keys are not looked for, but for each key an overlay is created and put into
+the editor state in `pixel-editor-state' as key value pair.
+
+An example of what this variable might look like:
+(:ov-complete :ov-source :ov-editor
+ :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas)")
 
 (defun pixel-editor-remove (editor)
+  "Remove a displayed EDITOR from its buffer.
+
+ See also `pixel-toggle-editor' and `delete-overlay'."
   (let ((modified-state (buffer-modified-p)))
     (dolist (key pixel-editor-overlays)
       (when (eq key :ov-editor)
@@ -362,12 +407,15 @@
     (pixel-editor-put editor nil)
     (set-buffer-modified-p modified-state)))
 
-;; (pixel-editor-create (pixel-find-palette :id "bnw") (pixel-find-bitmap :id "test1") (pixel-find-bitmap :find-origin t :id "test1")
-;;                      :background "#2f2f2f"
-;;                      :foreground "#ffffff"
-;;                      :source-background "#222222")
-
 (defun pixel-editor-init (editor bitmap &optional palette)
+  "Initialize an EDITOR state.
+
+This is supposed to be called after `pixel-editor-create' was called. It initializes
+several values in the EDITOR state with default values and values taken from BITMAP,
+which essentially sets EDITOR to display BITMAP in its canvas. The PALETTE argument
+is optional since BITMAP acts as its own palette or contains a reference to a palette.
+
+See also `pixel-editor-put' and `pixel-editor-state'."
   (unless palette
     (setq palette (pixel-find-palette :id (plist-get bitmap :palette-id))))
 
@@ -494,6 +542,12 @@
                    (setq editor (plist-put editor key ov))
                    (setq last-pos next-pos)))))
         (overlay-put ov-complete 'pixel-editor editor)))))
+
+;; (pixel-editor-create (pixel-find-palette :id "bnw") (pixel-find-bitmap :id "test1") (pixel-find-bitmap :find-origin t :id "test1")
+;;                      :background "#2f2f2f"
+;;                      :foreground "#ffffff"
+;;                      :source-background "#222222")
+
 
 ;;
 ;; Source

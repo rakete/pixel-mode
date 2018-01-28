@@ -518,9 +518,9 @@ See also `pixel-find-comma' for details on what a source text is."
   "Directory in which `pixel-mode' searches for palette files.")
 
 (defun* pixel-find-palette (&key (id nil) (bitmap nil) (marker nil) (origin nil) (find-origin nil))
-  "Find specific palette. Given an ID find a matching palette, given an BITMAP find the palette that
-matches the bitmaps palette id, given a MARKER find a palette at that marker, given an ORIGIN find a
-palette at a marker created from that origin.
+  "Find specific palette. Given an ID find a matching palette, given an BITMAP find the
+palette that matches the bitmaps palette id, given a MARKER find a palette at that
+ arker, given an ORIGIN find a palette at a marker created from that origin.
 
 Set FIND-ORIGIN to make this function return the origin instead of the palette.
 
@@ -644,7 +644,7 @@ Uses `pixel-list-buffer' to search a list of buffers for palettes."
 
 (defun pixel-cached (fn cache &rest args)
   "This takes a function FN and a symbol CACHE and then uses CACHE to store the result
-of FN or return an previously stored result.
+of FN or return a previously stored result.
 
 To do that it assumes that ARGS is a plist with an :id, :origin or :bitmap that it can
 use as key. It then treats CACHE like a hash-table and either returns the value associated
@@ -659,7 +659,9 @@ nothing yet associated with the key in the hash-table."
         (apply fn args))))
 
 (defun* pixel-toggle-editor (&key (id nil) (marker nil) (origin nil) (remove-active t))
-  "Toggle a pixel-mode editor between visible and invisible state."
+  "Toggle a pixel-mode editor between visible and invisible state.
+
+See also `pixel-editor-create' and `pixel-editor-remove'."
   (interactive)
   (unless (pixel-origin-p origin)
     (setq origin (cond ((stringp id)
