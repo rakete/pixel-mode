@@ -56,18 +56,21 @@
 ;;
 ;; Utilities
 ;;
+(defun pixel-make-image (&rest keys)
+  (find-image (list keys)))
+
 (defvar pixel-hover-face-cache (make-hash-table :test 'equal)
   "Used for caching the faces that are used when the mouse hovers over a pixel.
 
 See also `pixel-pixel-cache' and `pixel-make-hover-face'.")
 
-(defun pixel-make-hover-face (id)
+(defun pixel-make-hover-face (id x y)
   "Make a face that is supposed to be used for when the mouse hovers over a pixel.
 
 Use with the 'mouse-face property.
 
 The ID is used for caching the created face in `pixel-hover-face-cache'."
-  (let ((name (format "%s" id)))
+  (let ((name (format "%s|%d|%d" id x y)))
     (or (gethash name pixel-hover-face-cache nil)
         (puthash name
                  (let* ((sym (intern name))
@@ -96,10 +99,10 @@ See also `pixel-pixel-cache', `pixel-xpm-data', `pixel-make-bitmap' and
   (let ((key (format "%d%d%s" width (or height width) color)))
     (append (list 'image) (cdr (or (gethash key pixel-pixel-cache nil)
                                    (puthash key (let ((template (pixel-xpm-data (pixel-make-bitmap :width width :height (or height width)))))
-                                                  (find-image (list :type 'xpm
-                                                                    :data template
-                                                                    :color-symbols `(("col0"  . ,color))
-                                                                    :height (or height width)) ))
+                                                  (pixel-make-image  :type 'xpm
+                                                                     :data template
+                                                                     :color-symbols `(("col0"  . ,color))
+                                                                     :height (or height width)))
                                             pixel-pixel-cache))))))
 
 ;;
@@ -289,7 +292,7 @@ See also `pixel-editor-create', `pixel-editor-insert-toolbar' and `pixel-editor-
                                 'keymap editor-keymap)))
           (let* ((c (nth n colors))
                  (icon (pixel-make-pixel c rowheight))
-                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face")))
+                 (hover-face (pixel-make-hover-face "pixel-mode-palette-hover-face" n 0)))
             (puthash c (nth n symbols) color-map)
             (insert (propertize (if (string-equal c (car (last colors)))
                                     (propertize " " 'intangible 'editor)
@@ -344,7 +347,7 @@ See also `pixel-editor-create', `pixel-editor-insert-palette' and `pixel-editor-
                    (c (condition-case nil (elt colors v) (error "#000000")))
                    (a (condition-case nil (elt alphas v) (error 1)))
                    (pixel (pixel-make-pixel c (* zoomlevel 2)))
-                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face")))
+                   (hover-face (pixel-make-hover-face "pixel-mode-canvas-hover-face" x y)))
               (insert (propertize (if (eq x (- w 1))
                                       (propertize " " 'intangible 'editor)
                                     (propertize " "))
