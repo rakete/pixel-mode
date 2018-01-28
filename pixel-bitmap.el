@@ -117,12 +117,6 @@
 (defun pixel-bitmap-ref (bitmap x y)
   (aref (plist-get bitmap :array) (pixel-bitmap-index bitmap x y)))
 
-(defun pixel-bitmap-alpha (bitmap x y)
-  (aref (plist-get bitmap :alpha) (pixel-bitmap-index bitmap x y)))
-
-(defun pixel-bitmap-color (bitmap x y palette)
-  (aref (plist-get palette :colors) (pixel-bitmap-ref bitmap x y)))
-
 ;; (defun pixel-bitmap-color (bitmap x y palette)
 ;;   (let ((format (plist-get bitmap :format))
 ;;         (colors (plist-get palette :colors)))
