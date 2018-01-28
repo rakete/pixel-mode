@@ -218,7 +218,9 @@ This works just like `pixel-regex', but only matches GIMP palettes."
             "\\(\\(?:[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[0-9]+[ \t]*[^\n]*\n*\\)+\\)")))
 
 (defun* pixel-print-match (&key (bitmap nil) (palette nil) (id nil) (quick nil) (mm nil))
-  "After matching a `pixel-regex', this just prints all group matches."
+  "After matching a `pixel-regex', this just prints all group matches.
+
+"
   (interactive)
   (when (thing-at-point-looking-at (print (pixel-regex :bitmap bitmap :palette palette :id id :quick quick :mm mm)))
     (message "%s %s %s %s %s %s %s %s\n%s"
@@ -313,7 +315,9 @@ assume that there is a bitmap to match at the current point.
 It returns two plists, one for the bitmap and one describing the origin where the bitmap
 was matched, like the which buffer, location in the buffer, etc.
 
-See also `pixel-read-palette'."
+See also `pixel-find-bitmap', `pixel-regex' and `pixel-read-palette'.
+
+"
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -408,7 +412,11 @@ See also `pixel-find-comma' for details on what a source text is."
            3))))
 
 (defun pixel-read-palette (&optional marker)
-  "Same as `pixel-read-bitmap' but this reads a palette instead."
+  "Same as `pixel-read-bitmap' but this reads a palette instead.
+
+See also `pixel-find-palette' and `pixel-regex'.
+
+"
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -526,7 +534,9 @@ Set FIND-ORIGIN to make this function return the origin instead of the palette.
 
 This will also search `pixel-palettes-directory' for matching palettes.
 
-Uses `pixel-list-buffer' to search a list of buffers for palettes."
+Uses `pixel-list-buffer' to search a list of buffers for palettes.
+
+See also `pixel-read-palette' and `pixel-find-bitmap'."
   (when (and (pixel-bitmap-p bitmap)
              (setq id (plist-get bitmap :palette-id))))
   (let* ((id-regex (when id (concat "^" (replace-regexp-in-string "[ \t\n]" "." (regexp-quote id)))))
@@ -563,7 +573,9 @@ Uses `pixel-list-buffer' to search a list of buffers for palettes."
 ;; (pixel-find-palette :bitmap (pixel-find-bitmap :id "test1"))
 
 (defun* pixel-find-bitmap (&key (id nil) (marker nil) (origin nil) (find-origin nil))
-  "Find specific bitmap. Like `pixel-find-palette' but for bitmaps."
+  "Find specific bitmap. Like `pixel-find-palette' but for bitmaps.
+
+See also `pixel-read-bitmap'."
   (cond ((markerp marker)
          (plist-get (pixel-read-bitmap marker) (if find-origin :bitmap-origin :bitmap)))
         ((pixel-origin-p origin)
@@ -606,7 +618,10 @@ Uses `pixel-list-buffer' to search a list of buffers for palettes."
     result))
 
 (defun* pixel-list-bitmap (&key (buffer nil) (list-origin nil))
-  "List all bitmaps. Force with BUFFER to search single buffer, use LIST-ORIGIN to list bitmap origins instead."
+  "List all bitmaps. Force with BUFFER to search single buffer, use LIST-ORIGIN to list bitmap
+origins instead.
+
+See also `pixel-read-bitmap'."
   (let ((buffers (if buffer `(,buffer) (pixel-list-buffer)))
         (result '()))
     (loop for buf in buffers
