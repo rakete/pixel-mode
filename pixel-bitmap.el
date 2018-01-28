@@ -177,7 +177,7 @@
 ;;   (pixel-bitmap-set foo 2 3 2)
 ;;   (pixel-bitmap-ref foo 2 3))
 
-(defun* pixel-bitmap-diagonals (bitmap &key (gap 8) (color1 0) (color2 0))
+(defun* pixel-bitmap-set-diagonals (bitmap &key (gap 8) (color1 0) (color2 0))
   (let* ((w (plist-get bitmap :width))
          (h (plist-get bitmap :height))
          (n (/ w gap)))
@@ -189,9 +189,9 @@
                         (pixel-bitmap-set bitmap x y color1))))
     bitmap))
 
-;; (print (assoc :array (pixel-bitmap-diagonals (pixel-make-bitmap :width 8 :h 8 :background 0) :gap 4 :color1 1)))
+;; (print (assoc :array (pixel-bitmap-set-diagonals (pixel-make-bitmap :width 8 :h 8 :background 0) :gap 4 :color1 1)))
 
-(defun* pixel-bitmap-edges (bitmap &key (color1 0) (color2 0) (left t) (top t) (right t) (bottom t))
+(defun* pixel-bitmap-set-edges (bitmap &key (color1 0) (color2 0) (left t) (top t) (right t) (bottom t))
   (loop for y from 0 below (plist-get bitmap :height)
         do (loop for x from 0 below (plist-get bitmap :width)
                  do (when (or (eq y 0)
@@ -201,16 +201,16 @@
                       (pixel-bitmap-set bitmap x y color1))))
   bitmap)
 
-;; (pixel-bitmap-edges (pixel-make-bitmap :width 4 :h 4 :background 0) :color1 1)
+;; (pixel-bitmap-set-edges (pixel-make-bitmap :width 4 :h 4 :background 0) :color1 1)
 
-(defun* pixel-bitmap-alpha (bitmap &key (color -1))
+(defun* pixel-bitmap-set-alpha (bitmap &key (color -1))
   (let* ((array (make-vector (* (plist-get bitmap :width) (plist-get bitmap :h)) 1)))
     (pixel-bitmap-mapc (lambda (x y v) (when (not (eq v color))
                                          (aset array (pixel-bitmap-index bitmap x y) 0)))
                        bitmap)
     (append bitmap (list :alpha array))))
 
-;; (pixel-bitmap-alpha (pixel-make-bitmap :background 0) :color 0)
+;; (pixel-bitmap-set-alpha (pixel-make-bitmap :background 0) :color 0)
 
 (defun pixel-bitmap-resize (bitmap add-width add-height)
   (let* ((width (plist-get bitmap :width))
@@ -260,7 +260,7 @@
       (buffer-string))))
 
 ;; (let ((ppm (pixel-ppm (pixel-make-palette "#000000" "#ffffff" "#ff0000")
-;;                       (pixel-bitmap-edges (pixel-bitmap-diagonals (pixel-make-bitmap :width 16 :h 16 :background 0) :gap 4 :color1 2) :color1 1))))
+;;                       (pixel-bitmap-set-edges (pixel-bitmap-set-diagonals (pixel-make-bitmap :width 16 :h 16 :background 0) :gap 4 :color1 2) :color1 1))))
 ;;   (loop for n from 0 to 15
 ;;         do (insert-image (find-image `((:type pbm :data ,ppm :ascent center))))))
 
@@ -300,7 +300,7 @@
               `(,(concat "col" (prin1-to-string n)) . ,c))
             (plist-get palette :colors))))
 
-;; (let ((data (pixel-xpm-data (pixel-bitmap-edges (pixel-bitmap-diagonals (pixel-make-bitmap :width 16 :h 16 :background 0) :gap 4 :color1 2) :color1 1)))
+;; (let ((data (pixel-xpm-data (pixel-bitmap-set-edges (pixel-bitmap-set-diagonals (pixel-make-bitmap :width 16 :h 16 :background 0) :gap 4 :color1 2) :color1 1)))
 ;;       (colors (pixel-xpm-colors (pixel-make-palette "#000000" "#ffffff" "#ff0000"))))
 ;;   (loop for n from 0 to 0
 ;;         do (insert-image (find-image `((:type xpm :data ,data
