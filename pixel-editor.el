@@ -65,7 +65,7 @@
 See also `pixel-pixel-cache' and `pixel-make-hover-face'.")
 
 (defun pixel-make-hover-face (id x y)
-  "Make a face that is supposed to be used for when the mouse hovers over a pixel.
+  "Make a face that is used when the mouse hovers over a pixel.
 
 Use with the 'mouse-face property.
 
@@ -396,7 +396,7 @@ An example of what this variable might look like:
 (defun pixel-editor-remove (editor)
   "Remove a displayed EDITOR from its buffer.
 
- See also `pixel-toggle-editor' and `delete-overlay'."
+See also `pixel-toggle-editor' and `delete-overlay'."
   (let ((modified-state (buffer-modified-p)))
     (dolist (key pixel-editor-overlays)
       (when (eq key :ov-editor)
@@ -413,10 +413,12 @@ An example of what this variable might look like:
 (defun pixel-editor-init (editor bitmap &optional palette)
   "Initialize an EDITOR state.
 
-This is supposed to be called after `pixel-editor-create' was called. It initializes
-several values in the EDITOR state with default values and values taken from BITMAP,
-which essentially sets EDITOR to display BITMAP in its canvas. The PALETTE argument
-is optional since BITMAP acts as its own palette or contains a reference to a palette.
+The EDITOR argument is a plist as created by `pixel-editor-create'.
+
+This functions initializes several values in the EDITOR state with default
+values and values taken from BITMAP, which essentially sets EDITOR to display
+BITMAP in its canvas. The PALETTE argument is optional since BITMAP acts as
+its own palette or contains a reference to a palette.
 
 See also `pixel-editor-put' and `pixel-editor-state'."
   (unless palette
@@ -449,6 +451,22 @@ See also `pixel-editor-put' and `pixel-editor-state'."
   (pixel-editor-put editor :bitmap-format (plist-get bitmap :format)))
 
 (defun* pixel-editor-create (origin &key (background nil) (foreground nil) (source-background nil))
+  "Go through `pixel-editor-overlays' and create the overlays for an editor,
+return a plist describing the created editor.
+
+This does ONLY create the overlays. After this function, `pixel-editor-init'
+should be called to initialize the editors state in `pixel-editor-state'. And
+then the functions `pixel-editor-insert-palette', `pixel-editor-insert-toolbar'
+and `pixel-editor-insert-canvas' should be called to 'fill' the empty overlays
+this function created with the actual editor content.
+
+The ORIGIN argument is an origin as returned by `pixel-read-bitmap' or
+`pixel-read-palette', see `pixel-origin-p' for more information.
+
+The BACKGROUND, FOREGROUND and SOURCE-BACKGROUND arguments can be used to
+specify the colors that should be used for back- and foreground and the source
+code background respectivly.
+"
   (when (and origin)
     (unless background
       (setq background (face-attribute 'default :background)))
@@ -557,6 +575,9 @@ See also `pixel-editor-put' and `pixel-editor-state'."
 ;;
 
 (defun pixel-source-color (editor color &optional alpha)
+  "Convert COLOR, with optional ALPHA component, from emacs name representation as
+accepted by `color-name-to-rgb' into the format that fits the source code from
+which EDITOR was created."
   (let ((format (pixel-editor-get editor :bitmap-format)))
     (cond ((string-equal format "palette")
            (let ((ov-palette (pixel-editor-get editor :ov-palette)))
@@ -574,6 +595,13 @@ See also `pixel-editor-put' and `pixel-editor-state'."
                         comma))))))
 
 (defun pixel-source-replace-pixel (editor x y color)
+  "Replace pixel at position X, Y in the source code of EDITOR with COLOR.
+
+The COLOR argument is a list (x y color) which can be created by calling
+`pixel-source-color'.
+
+The arguments X, Y and COLOR can be lists of multiple coordinates and colors
+so that many occurances of colors can be replaced in one batch."
   (let* ((width (pixel-editor-get editor :bitmap-width))
          (height (pixel-editor-get editor :bitmap-height))
          (stride (pixel-editor-get editor :bitmap-stride))
@@ -613,11 +641,15 @@ See also `pixel-editor-put' and `pixel-editor-state'."
 ;;
 
 (defun pixel-neighbours (x y)
+  "Create neighbouring coordinates as list for the X, Y coordinate."
   (mapcar (lambda (shift) (list (+ x (nth 0 shift))
                                 (+ y (nth 1 shift))))
           '((0 -1) (1 -1) (1 0) (1 1) (0 1) (-1 1) (-1 0) (-1 -1))))
 
 (defun pixel-tool-fill (input type editor x0 y0 color0 alpha0 &optional x1 y1 color1 alpha1 state)
+  "Tool for filling an area of a bitmap with a single color.
+
+See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-keypress'"
   (unless (and x1 y1)
     (let* ((start-x x0)
            (start-y y0)
@@ -659,6 +691,9 @@ See also `pixel-editor-put' and `pixel-editor-state'."
       (plist-put state :updates updates))))
 
 (defun pixel-tool-draw (input type editor x0 y0 color0 alpha0 &optional x1 y1 color1 alpha1 state)
+  "Tool for drawing pixels by dragging the mouse.
+
+See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-keypress'"
   (let ((x (or x1 x0))
         (y (or y1 y0))
         (color (or color1 color0))
@@ -673,6 +708,9 @@ See also `pixel-editor-put' and `pixel-editor-state'."
                       (plist-get state :updates)))))
 
 (defun pixel-tool-rectangle (input type editor x0 y0 color0 alpha0 &optional x1 y1 color1 alpha1 state)
+  "Tool for drawing a rectangle by dragging the mouse.
+
+See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-keypress'"
   (let* ((w (pixel-editor-get editor :bitmap-width))
          (h (pixel-editor-get editor :bitmap-height))
          (color (pixel-editor-get editor :palette-foreground))
@@ -713,9 +751,15 @@ See also `pixel-editor-put' and `pixel-editor-state'."
                    :layer-overlays new-layer-overlays)))))
 
 (defun pixel-tool-rectangle-filled (input type editor x0 y0 color0 alpha0 &optional x1 y1 color1 alpha1 state)
+  "Tool for drawing a filled rectangle by dragging the mouse.
+
+See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-keypress'"
   (pixel-tool-rectangle input type editor x0 y0 color0 alpha0 x1 y1 color1 alpha1 (plist-put state :fill t)))
 
 (defun pixel-canvas-point (editor &optional x y)
+  "Compute `point' for pixel at coordinate X, Y on the canvas of EDITOR.
+
+See also `get-text-property'."
   (unless (and x y)
     (setq x (get-text-property (point) 'pixel-x)
           y (get-text-property (point) 'pixel-y)))
@@ -726,6 +770,11 @@ See also `pixel-editor-put' and `pixel-editor-state'."
       (+ (overlay-start ov) 1 (* y 2) (* y w) x))))
 
 (defun pixel-canvas-color (editor &optional x y)
+  "Get the color of the pixel at coordinate X, Y on the canvas of EDITOR.
+
+X or Y are optional, if not specified the 'pixel-color at `point' is used.
+
+See also `pixel-canvas-point'."
   (unless (and x y)
     (setq x (get-text-property (point) 'pixel-x)
           y (get-text-property (point) 'pixel-y)))
@@ -733,16 +782,34 @@ See also `pixel-editor-put' and `pixel-editor-state'."
     (get-text-property (pixel-canvas-point editor x y) 'pixel-color)))
 
 (defun pixel-canvas-alpha (editor &optional x y)
+  "Get the alpha component of the pixel at coordinate X, Y on the canvas of EDITOR.
+
+X or Y are optional, if not specified the pixel at `point' is used.
+
+See also `pixel-canvas-point'."
   (unless (and x y)
     (setq x (get-text-property (point) 'pixel-x)
           y (get-text-property (point) 'pixel-y)))
   (when (and x y)
     (get-text-property (pixel-canvas-point editor x y) 'pixel-alpha)))
 
-(defun pixel-canvas-merge (editor state)
+(defun pixel-canvas-discard (state)
+  "Discard :layer-overlays from STATE."
   (let ((layer-overlays (plist-get state :layer-overlays)))
     (dolist (ov layer-overlays)
-      (delete-overlay ov)))
+      (delete-overlay ov))))
+
+(defun pixel-canvas-merge (editor state)
+  "Merge :updates from STATE into the canvas of EDITOR.
+
+When `pixel-make-canvas-motion' or `pixel-make-canvas-keypress' apply a tool
+to an editors canvas, the tool does not directly affect the canvas but rather
+returns a list of updates. This function applies these :updates from STATE
+to the canvas of EDITOR, and additionally deletes all :layer-overlays from
+STATE because these are not neccessary to keep once the :updates are applied.
+
+See also `pixel-canvas-layer'."
+  (pixel-canvas-discard state)
   (dolist (u (plist-get state :updates))
     (let* ((x (nth 0 u))
            (y (nth 1 u))
@@ -756,7 +823,22 @@ See also `pixel-editor-put' and `pixel-editor-state'."
       (put-text-property beg end 'pixel-alpha alpha)
       (pixel-source-replace-pixel editor x y (pixel-source-color editor color alpha)))))
 
-(defun* pixel-canvas-layer (editor state)
+(defun pixel-canvas-layer (editor state)
+  "Make a layer for EDITOR from the :updates in STATE.
+
+As explained in `pixel-canvas-merge', the tool functions return a list
+of updates instead of modifying the canvas directly. This function
+creates overlays that show these updates to the user, without them
+being applied yet to the canvas. These temporary overlays only showing
+one possible update to the canvas, are called a layer.
+
+There are two properties that are added to STATE by this function:
+:layer which is a vector that can hold an overlay for every pixel
+of the canvas. And :layer-overlays which holds the same overlays,
+but as list (I don't remember why I implemented it like this).
+
+See also `pixel-canvas-discard', `pixel-make-canvas-motion' and
+`pixel-make-canvas-keypress'."
   (let* ((w (pixel-editor-get editor :bitmap-width))
          (h (pixel-editor-get editor :bitmap-height))
          (updates (sort (copy-list (plist-get state :updates))
@@ -789,6 +871,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
     (plist-put (plist-put state :layer layer) :layer-overlays layer-overlays)))
 
 (defun pixel-canvas-refresh (editor)
+  "Refresh the canvas of EDITOR."
   (let* ((modified-state (buffer-modified-p))
          (ov-canvas (pixel-editor-get editor :ov-canvas))
          (bitmap-id (pixel-editor-get editor :bitmap-id))
@@ -803,6 +886,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
     (goto-char p)))
 
 (defun pixel-canvas-replace (editor bitmap)
+  "Replace the bitmap displayed on the canvas of EDITOR with BITMAP."
   (with-current-buffer (pixel-editor-buffer editor)
     (save-excursion
       (let* ((ov-array (pixel-editor-get editor :ov-array))
@@ -870,6 +954,13 @@ See also `pixel-editor-put' and `pixel-editor-state'."
         ))))
 
 (defun pixel-canvas-resize (editor add-width add-height)
+  "Resize the canvas of EDITOR and the bitmap displayed on it
+by adding ADD-WIDTH and ADD-HEIGHT in pixels to it.
+
+When called interactively without arguments this will prompt
+the user to enter a new size manually.
+
+See also `pixel-bitmap-resize'."
   (interactive
    (let ((editor (pixel-find-editor :point (point))))
      (when editor
@@ -891,6 +982,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
     (pixel-canvas-view editor p)))
 
 (defun pixel-canvas-view (editor &optional p)
+  "Center view on the canvas of EDITOR and optionally point P."
   (let* ((ov-editor (pixel-editor-get editor :ov-editor))
          (s (overlay-start ov-editor)))
     (save-excursion
@@ -911,10 +1003,55 @@ See also `pixel-editor-put' and `pixel-editor-state'."
 ;;
 
 (defun pixel-editor-tool-switch (editor tool)
+  "Switch the current tool in EDITOR to TOOL.
+
+See also `pixel-make-editor-keymap'."
   (message "%s" (prin1-to-string tool))
   (pixel-editor-put editor :tool-current tool))
 
 (defun pixel-make-canvas-keypress (input type editor &optional tool)
+  "Create and return a lambda function to handle keypress events while
+`point' is inside the canvas of EDITOR.
+
+The returned lambda is supposed to be used as a definition of a key
+in `define-key'. It handles a keypress by passing INPUT TYPE EDITOR
+as well as the x and y coordinate, color and alpha of the pixel at
+`point' to the currently selected tool in EDITOR, or to optionally
+specified TOOL.
+
+A TOOL is a function that takes the following argument list:
+input type editor x0 y0 color0 alpha0 &optional x1 y1 color1 alpha1 state
+
+where the first seven arguments are neccessary for a single action
+of the tool, and the optional arguments are used when the tool is
+dragged over the canvas. Dragging a tool means repeatedly calling
+it with with x0, y0, color0, alpha0 being from the pixel where the
+tools action was first invoked, and x1, y1, color1, alpha1 from the
+pixel where the tool was dragged to. Also the last state argument
+is only relevant when dragging, when only a single action is perfomed
+the tool function simply changes the current state and returns a new
+state, but when repeatedly calling the tool function when dragging
+it may need to keep some state for its execution, which is achieved
+by passing the returned state into the next call again.
+
+Dragging for keypress events is implemented differently then dragging
+for mouse events in `pixel-make-canvas-motion'. When a tool is marked
+as draggable by being listed in `pixel-draggable-tools', it is switched
+to dragging state and either aborts and discards its changes, or finishes
+and merges its changes into the canvas.
+
+While a tool is dragged, the cursor keys up, down, left, right cause
+the dragging to occur, return or space cause the tool to finish dragging
+and merge its result into the canvas and escape or C-g cause the dragging
+to abort and its changes to be discarded.
+
+While dragging the changes of the tool are only shown temporarily,
+this is done with a layer created by `pixel-canvas-layer'. When the
+dragging is finished this layer is merged into the canvas with
+`pixel-canvas-merge'. When the dragging is aborted the layer is discarded
+with `pixel-canvas-discard'.
+
+See also `with-local-quit'."
   (lambda (&optional pos)
     (interactive)
     (let* ((x (get-text-property (point) 'pixel-x))
@@ -970,6 +1107,13 @@ See also `pixel-editor-put' and `pixel-editor-state'."
              (pixel-canvas-merge editor (funcall tool input type editor x y color alpha)))))))
 
 (defun pixel-make-canvas-motion (input type editor &optional tool)
+  "Create and return a lambda function to handle mouse motion events while
+`point' is inside the canvas of EDITOR.
+
+This works very similar to `pixel-make-canvas-keypress', but it can make use
+of emacs function `track-mouse' to keep track of mouse dragging.
+
+See also `with-local-quit'."
   (lambda (event)
     (interactive "e")
     (let* ((tool (or tool (pixel-editor-get editor :tool-current)))
@@ -1019,10 +1163,16 @@ See also `pixel-editor-put' and `pixel-editor-state'."
 ;;     (print event)))
 
 (defun pixel-editor-shortcut-get (editor n)
+  "Set foreground color of EDITOR to the color that shortcut N is set to.
+
+See also `pixel-make-action'."
   (let ((shortcuts (pixel-editor-get editor :palette-shortcuts)))
     (pixel-editor-foreground-set editor (nth n shortcuts))))
 
 (defun pixel-editor-shortcut-set (editor n &optional color)
+  "Set shortcut N in EDITOR to COLOR or the current 'pixel-color at `point'.
+
+See also `pixel-make-action'."
   (let ((shortcuts (pixel-editor-get editor :palette-shortcuts))
         (color (or color (get-text-property (point) 'pixel-color))))
     (setf (nth n shortcuts) color)
@@ -1030,22 +1180,41 @@ See also `pixel-editor-put' and `pixel-editor-state'."
     (pixel-editor-put editor :palette-shortcuts shortcuts)))
 
 (defun pixel-editor-foreground-set (editor &optional color)
+  "Set foreground color of EDITOR to COLOR or the current 'pixel-color at `point'.
+
+See also `pixel-make-action'."
   (let ((color (or color (get-text-property (point) 'pixel-color))))
     (pixel-editor-update editor :palette-foreground color)
     (pixel-editor-put editor :palette-foreground color)))
 
 (defun pixel-canvas-pick-color (editor)
+  "Pick color at `point' in EDITOR.
+
+See also `pixel-make-action' and `pixel-canvas-color'."
   (let ((color (pixel-canvas-color editor)))
     (when color
       (pixel-editor-update editor :palette-foreground color)
       (pixel-editor-put editor :palette-foreground color))))
 
 (defun* pixel-make-action (editor action &rest args)
+  "Create and return a lambda function to trigger a ACTION that is applied
+to the EDITOR and ARGS.
+
+An ACTION is something that changes the state of the editor, but not the
+canvas. For example `pixel-editor-shortcut-get', `pixel-editor-shortcut-set',
+`pixel-editor-foreground-set' and `pixel-editor-pick-color' are all
+actions.
+
+See also `pixel-make-mouse-action'."
   (lambda (&optional pos)
     (interactive)
     (apply action (append (list editor) args))))
 
 (defun* pixel-make-mouse-action (editor action &rest args)
+  "Special version of `pixel-make-action' for actions triggered by clicking
+with the mouse.
+
+See also `mouse-set-point'."
   (lambda (event)
     (interactive "e")
     (mouse-set-point event)
@@ -1053,6 +1222,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
 
 
 (defun pixel-make-editor-keymap (editor map)
+  "Define keybindings that are useable everywhere in EDITOR in MAP."
   (suppress-keymap map)
   (define-key map (kbd "d") (pixel-make-action editor 'pixel-editor-tool-switch 'pixel-tool-draw))
   (define-key map (kbd "f") (pixel-make-action editor 'pixel-editor-tool-switch 'pixel-tool-fill))
@@ -1063,6 +1233,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
   map)
 
 (defun pixel-make-canvas-keymap (editor map)
+  "Define keybindings that are useable on the canvas of EDITOR in MAP."
   (suppress-keymap map)
   (define-key map (kbd "<RET>") (pixel-make-canvas-keypress 'keyboard 'single editor))
   (define-key map (kbd "<SPC>") (pixel-make-canvas-keypress 'keyboard 'single editor))
@@ -1089,6 +1260,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
   map)
 
 (defun pixel-make-palette-keymap (editor map)
+  "Define keybindings that are useable on the palette of EDITOR in MAP."
   (suppress-keymap map)
   (define-key map (kbd "<RET>") (pixel-make-action editor 'pixel-editor-foreground-set))
   (define-key map (kbd "<SPC>") (pixel-make-action editor 'pixel-editor-foreground-set))
