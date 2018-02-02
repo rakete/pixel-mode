@@ -1106,8 +1106,7 @@ See also `with-local-quit'."
                             t))
                (if (or (not done)
                        (eq event 'escape))
-                   (dolist (ov (plist-get state :layer-overlays))
-                     (delete-overlay ov))
+                   (pixel-canvas-discard state)
                  (pixel-canvas-merge editor state))))
             (t
              (pixel-canvas-merge editor (funcall tool input type editor x y color alpha)))))))
@@ -1158,8 +1157,7 @@ See also `with-local-quit'."
                      t)))
       (if (or (not done)
               (eq event 'escape))
-          (dolist (ov (plist-get state :layer-overlays))
-            (delete-overlay ov))
+          (pixel-canvas-discard state)
         (pixel-canvas-merge editor state)))))
 
 ;; (let ((event nil))
