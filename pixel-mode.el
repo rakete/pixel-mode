@@ -308,14 +308,16 @@ a float, this will return float, otherwise it returns int."
 ;; (pixel-find-type '(0 0 0 0 0.1))
 
 (defun pixel-read-bitmap (&optional marker)
-  "This function uses the groups from `pixel-regex' to read a bitmap into a plist. It can
-be applied to specific region of a buffer by supplying a MARKER, otherwise it will just
-assume that there is a bitmap to match at the current point.
+  "This function uses the groups from `pixel-regex' to read a bitmap into
+a plist. It can be applied to specific region of a buffer by supplying a MARKER,
+otherwise it will just assume that there is a bitmap to match at the current
+point.
 
-It returns two plists, one for the bitmap and one describing the origin where the bitmap
-was matched, like the which buffer, location in the buffer, etc.
+It returns two plists, one for the bitmap and one describing the origin
+where the bitmap was matched, which buffer and the region it matched.
 
-See also `pixel-find-bitmap', `pixel-regex' and `pixel-read-palette'.
+See also `pixel-find-bitmap', `pixel-regex', `pixel-read-palette' and
+`pixel-origin-p'.
 
 "
   (interactive)
@@ -414,7 +416,12 @@ See also `pixel-find-comma' for details on what a source text is."
 (defun pixel-read-palette (&optional marker)
   "Same as `pixel-read-bitmap' but this reads a palette instead.
 
-See also `pixel-find-palette' and `pixel-regex'.
+A special case this function handles is reading a palette from a
+truecolor bitmap. That is if a bitmap uses rgb tuples for its colors
+instead of indices into a palette, the bitmap itself acts like a
+palette, and can be read by this function as such.
+
+See also `pixel-find-palette', `pixel-regex' and `pixel-origin-p'.
 
 "
   (interactive)
@@ -492,7 +499,17 @@ See also `pixel-find-palette' and `pixel-regex'.
                                       :buffer (current-buffer))))))))
 
 (defun pixel-origin-p (origin)
-  "Test if a plist ORIGIN is a origin as returned by either `pixel-read-bitmap' or `pixel-read-palette'."
+  "Test if ORIGIN is a plist that looks like an origin.
+
+Both `pixel-read-bitmap' and `pixel-read-palette' return an origin in addition
+to the bitmap/palette, which is a plist describing the region which matched
+the `pixel-regex'.
+
+The origin plist contains the :beginning and :end of the region, the :buffer
+where the region is and an :id the can be used to identify which bitmap or
+palette the origin belongs to.
+
+"
   (when (and (listp origin)
              (plist-get origin :id)
              (plist-get origin :beginning)
@@ -531,6 +548,8 @@ palette that matches the bitmaps palette id, given a MARKER find a palette at th
  arker, given an ORIGIN find a palette at a marker created from that origin.
 
 Set FIND-ORIGIN to make this function return the origin instead of the palette.
+An origin describes a location of a palette or bitmap matched with `pixel-regex',
+see also `pixel-origin-p' for more information.
 
 This will also search `pixel-palettes-directory' for matching palettes.
 
