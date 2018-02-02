@@ -1011,6 +1011,8 @@ See also `pixel-make-editor-keymap'."
   (message "%s" (prin1-to-string tool))
   (pixel-editor-put editor :tool-current tool))
 
+(defvar pixel-draggable-tools '(pixel-tool-rectangle pixel-tool-rectangle-filled))
+
 (defun pixel-make-canvas-keypress (input type editor &optional tool)
   "Create and return a lambda function to handle keypress events while
 `point' is inside the canvas of EDITOR.
@@ -1061,8 +1063,7 @@ See also `with-local-quit'."
            (color (get-text-property (point) 'pixel-color))
            (alpha (get-text-property (point) 'pixel-alpha))
            (tool (or tool (pixel-editor-get editor :tool-current))))
-      (cond ((or (eq tool 'pixel-tool-rectangle)
-                 (eq tool 'pixel-tool-rectangle-filled))
+      (cond ((cl-some (lambda (draggable) (eq tool draggable)) pixel-draggable-tools)
              (let ((event nil)
                    (state (funcall tool input type editor x y color alpha))
                    (last-x x)
