@@ -25,12 +25,12 @@
 
 ;; This file contains the user interface code of pixel-mode. An editor
 ;; is what pixel-mode calls such an user interface: a gui displayed inside
-;; of an emacs buffer that can be used like an image manipulation program
+;; of an Emacs buffer that can be used like an image manipulation program
 ;; to modify/create pixel art.
 ;; Here you'll find functionality for creating and updating the editor
 ;; gui, for synchronizing the editor state with the array in the buffer
 ;; and for reacting to user input by mouse and keyboard. Editors are
-;; implemented using overlays and rely heavily on the feature that emacs
+;; implemented using overlays and rely heavily on the feature that Emacs
 ;; can display overlay text in a buffer without it actually being inserted
 ;; into the file.
 
@@ -57,6 +57,7 @@
 ;; Utilities
 ;;
 (defun pixel-make-image (&rest keys)
+  "A wrapper around `find-image' that passes KEYS as list."
   (find-image (list keys)))
 
 (defvar pixel-hover-face-cache (make-hash-table :test 'equal)
@@ -69,7 +70,7 @@ See also `pixel-pixel-cache' and `pixel-make-hover-face'.")
 
 Use with the 'mouse-face property.
 
-The ID is used for caching the created face in `pixel-hover-face-cache'."
+The ID, X and Y are used for caching the created face in `pixel-hover-face-cache'."
   (let ((name (format "%s|%d|%d" id x y)))
     (or (gethash name pixel-hover-face-cache nil)
         (puthash name
@@ -109,18 +110,19 @@ See also `pixel-pixel-cache', `pixel-xpm-data', `pixel-make-bitmap' and
 ;; State
 ;;
 (defvar pixel-editor-state (make-hash-table :test 'equal)
-  "Hashtable that keep track of each editors state. The keys are editor :ids,
-the values are plists containing things like the currently active tool or the
-selected color of an editor, but also things like the overlays that the editor
-consists of.
+  "Hashtable that keep track of each editors state.
+
+ The keys are editor :ids, the values are plists containing things like the
+ currently active tool or the selected color of an editor, but also things
+ like the overlays that the editor consists of.
 
 See also `pixel-editor-put', `pixel-editor-update' and `pixel-editor-get'.")
 
 (defun pixel-editor-put (editor prop &optional val)
-  "Put a property PROP with a value VAL into the state of EDITOR saved in
-`pixel-editor-state'.
+  "Put into EDITOR a property PROP with a value VAL.
 
-See also `pixel-editor-update', `pixel-editor-get' and `plist-put'."
+See also `pixel-editor-state', `pixel-editor-update', `pixel-editor-get'
+and `plist-put'."
   (or (and (plist-get editor prop)
            (plist-put editor prop val))
       (let* ((key (plist-get editor :id)))
@@ -136,10 +138,10 @@ See also `pixel-editor-update', `pixel-editor-get' and `plist-put'."
 ;; (pixel-editor-put (list :id "aaa" :foo "lala") :ficken "bar")
 
 (defun pixel-editor-update (editor prop val)
-  "Update poperties PROP with new value VAL in state of EDITOR saved in
-`pixel-editor-state'.
+  "Update EDITOR popertiy PROP with new value VAL.
 
-See also `pixel-editor-put', `pixel-editor-get' and `plist-put'."
+See also `pixel-editor-state', `pixel-editor-put', `pixel-editor-get'
+and `plist-put'."
   (let* ((ov (pixel-editor-get editor :ov-editor))
          (start (overlay-start ov))
          (end (overlay-end ov))
@@ -150,11 +152,12 @@ See also `pixel-editor-put', `pixel-editor-get' and `plist-put'."
           (add-text-properties pos (1+ pos) (funcall update-fn val)))))))
 
 (defun pixel-editor-get (editor &optional prop default)
-  "Get poperties PROP value from the state of EDITOR save in `pixel-editor-state'.
+  "Get EDITOR poperty PROP value.
 
 If there is no value in the editor state yet, return DEFAULT.
 
-See also `pixel-editor-update', `pixel-editor-put' and `plist-get'."
+See also `pixel-editor-state', `pixel-editor-update', `pixel-editor-put'
+and `plist-get'."
   (or (plist-get editor prop)
       (let* ((key (plist-get editor :id)))
         (when key
@@ -245,7 +248,7 @@ See also `pixel-editor-create', `pixel-editor-insert-palette' and `pixel-editor-
                                   'keymap editor-keymap)))))))))
 
 (defun pixel-editor-insert-palette (editor palette)
-  "Helper function to put a clickable PALETTE on an already created EDITOR.
+  "Insert into EDITOR a clickable PALETTE.
 
 See also `pixel-editor-create', `pixel-editor-insert-toolbar' and `pixel-editor-insert-canvas'."
   (when (and editor palette)
@@ -267,8 +270,7 @@ See also `pixel-editor-create', `pixel-editor-insert-toolbar' and `pixel-editor-
              (disable-point-adjustment t)
              (color-map (make-hash-table :test 'equal))
              (editor-keymap (pixel-make-editor-keymap editor (make-sparse-keymap)))
-             (palette-keymap (pixel-make-palette-keymap editor editor-keymap))
-             (line-end nil))
+             (palette-keymap (pixel-make-palette-keymap editor editor-keymap)))
         (goto-char start)
         (when (<= (- (point) (point-at-bol)) 0)
           (insert (propertize " "
@@ -376,10 +378,10 @@ See also `pixel-editor-create', `pixel-editor-insert-palette' and `pixel-editor-
   '(:ov-complete :ov-source :ov-editor :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas)
   "Customize the order and visibility of editor 'sections'.
 
-Each editor consists of several overlays, one for the part that shows the source code,
-one for the part that contains the canvas, etc. This variable holds keys that identify
-the different sections and can be used to change the order in which the sections are
-inserted into a buffer or to disable a section altogether.
+Each editor consists of several overlays, one for the part that shows the source
+code, one for the part that contains the canvas, etc. This variable holds keys
+that identify the different sections and can be used to change the order in which
+the sections are inserted into a buffer or to disable a section altogether.
 
 The following keys are looked for specifically by `pixel-editor-create':
 :ov-complete : encompasses the whole editor
@@ -390,8 +392,8 @@ All other keys are not looked for, but for each key an overlay is created and pu
 the editor state in `pixel-editor-state' as key value pair.
 
 An example of what this variable might look like:
-(:ov-complete :ov-source :ov-editor
- :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas)")
+\(:ov-complete :ov-source :ov-editor
+ :ov-seperator2 :ov-palette :ov-seperator3 :ov-toolbar :ov-seperator4 :ov-canvas\)")
 
 (defun pixel-editor-remove (editor)
   "Remove a displayed EDITOR from its buffer.
@@ -575,9 +577,11 @@ code background respectivly.
 ;;
 
 (defun pixel-source-color (editor color &optional alpha)
-  "Convert COLOR, with optional ALPHA component, from emacs name representation as
-accepted by `color-name-to-rgb' into the format that fits the source code from
-which EDITOR was created."
+  "For EDITOR convert COLOR with optional ALPHA into source format.
+
+Convert COLOR, with optional ALPHA component, from Emacs name representation
+as accepted by `color-name-to-rgb' into the format that fits the source code
+from which EDITOR was created."
   (let ((format (pixel-editor-get editor :bitmap-format)))
     (cond ((string-equal format "palette")
            (let ((ov-palette (pixel-editor-get editor :ov-palette)))
@@ -1226,7 +1230,9 @@ See also `mouse-set-point'."
 
 
 (defun pixel-make-editor-keymap (editor map)
-  "Define keybindings that are useable everywhere in EDITOR in MAP."
+  "Define keybindings that are useable everywhere in EDITOR in MAP.
+
+See also `pixel-make-action' and `pixel-make-canvas-keypress'."
   (suppress-keymap map)
   (define-key map (kbd "d") (pixel-make-action editor 'pixel-editor-tool-switch 'pixel-tool-draw))
   (define-key map (kbd "f") (pixel-make-action editor 'pixel-editor-tool-switch 'pixel-tool-fill))
@@ -1237,7 +1243,9 @@ See also `mouse-set-point'."
   map)
 
 (defun pixel-make-canvas-keymap (editor map)
-  "Define keybindings that are useable on the canvas of EDITOR in MAP."
+  "Define keybindings that are useable on the canvas of EDITOR in MAP.
+
+See also `pixel-make-action' and `pixel-make-canvas-keypress'."
   (suppress-keymap map)
   (define-key map (kbd "<RET>") (pixel-make-canvas-keypress 'keyboard 'single editor))
   (define-key map (kbd "<SPC>") (pixel-make-canvas-keypress 'keyboard 'single editor))
@@ -1264,7 +1272,9 @@ See also `mouse-set-point'."
   map)
 
 (defun pixel-make-palette-keymap (editor map)
-  "Define keybindings that are useable on the palette of EDITOR in MAP."
+  "Define keybindings that are useable on the palette of EDITOR in MAP.
+
+See also `pixel-make-action' and `pixel-make-canvas-keypress'."
   (suppress-keymap map)
   (define-key map (kbd "<RET>") (pixel-make-action editor 'pixel-editor-foreground-set))
   (define-key map (kbd "<SPC>") (pixel-make-action editor 'pixel-editor-foreground-set))

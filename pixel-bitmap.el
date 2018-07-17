@@ -22,21 +22,10 @@
 ;; Nothing so far
 
 ;;; Code
-(defun pixel-make-palette (colors &optional symbols)
-  (unless (listp colors)
-    (setq colors (list colors)))
-  (unless (listp symbols)
-    (setq symbols (list symbols)))
-  (list :colors colors
-        :symbols (or symbols
-                     (loop for i from 0 upto (length colors) collect (prin1-to-string i)))
-        :format "palette"
-        :type "int"
-        :comma " "
-        :open "["
-        :clos "]"))
+(require 'color)
 
 (defun pixel-normalize-color (type color)
+  "Convert COLOR from TYPE to a float color representation."
   (let ((ret (if (string-equal type "int")
                  (list (/ (float (nth 0 color)) (float 255))
                        (/ (float (nth 1 color)) (float 255))
@@ -212,7 +201,7 @@
          (new-width (+ width add-width))
          (new-height (+ height add-height))
          (new-array (make-vector (* new-width new-height) 0))
-         (new-bitmap (copy-list bitmap)))
+         (new-bitmap (cl-copy-list bitmap)))
     (plist-put new-bitmap :width new-width)
     (plist-put new-bitmap :height new-height)
     (dotimes (x new-width)
@@ -234,7 +223,6 @@
     bitmap))
 
 ;;(pixel-bitmap-p (pixel-find-bitmap :id "test1"))
-
 (defun pixel-ppm (palette bitmap)
   (let ((w (plist-get bitmap :width))
         (h (plist-get bitmap :height))

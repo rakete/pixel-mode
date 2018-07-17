@@ -25,10 +25,10 @@
 
 ;;; Commentary:
 
-;; A minor mode for drawing pixel art inside emacs buffers. This makes
+;; A minor mode for drawing pixel art inside Emacs buffers. This makes
 ;; it possible to easily create programming language arrays representing
 ;; bitmaps visually. They can be drawn with the mouse right inside an
-;; emacs buffer, making this mode a very convenient tool to quickly
+;; Emacs buffer, making this mode a very convenient tool to quickly
 ;; create icons or other small 'programmer art'.
 
 ;; This file contains the code to deal with matching arrays as bitmaps
@@ -317,9 +317,7 @@ It returns two plists, one for the bitmap and one describing the origin
 where the bitmap was matched, which buffer and the region it matched.
 
 See also `pixel-find-bitmap', `pixel-regex', `pixel-read-palette' and
-`pixel-origin-p'.
-
-"
+`pixel-origin-p'."
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -421,9 +419,7 @@ truecolor bitmap. That is if a bitmap uses rgb tuples for its colors
 instead of indices into a palette, the bitmap itself acts like a
 palette, and can be read by this function as such.
 
-See also `pixel-find-palette', `pixel-regex' and `pixel-origin-p'.
-
-"
+See also `pixel-find-palette', `pixel-regex' and `pixel-origin-p'."
   (interactive)
   (with-current-buffer (or (when (markerp marker) (marker-buffer marker)) (current-buffer))
     (save-excursion
@@ -507,9 +503,7 @@ the `pixel-regex'.
 
 The origin plist contains the :beginning and :end of the region, the :buffer
 where the region is and an :id the can be used to identify which bitmap or
-palette the origin belongs to.
-
-"
+palette the origin belongs to."
   (when (and (listp origin)
              (plist-get origin :id)
              (plist-get origin :beginning)
