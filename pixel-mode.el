@@ -41,7 +41,7 @@
 ;; And saving buffers while pixel editors are active.
 
 ;;; Code:
-(require 'cl)
+(require 'cl-lib)
 (require 'color)
 
 (require 'pixel-bitmap)
@@ -250,7 +250,7 @@ I also like to call X the stride."
     (setq x 1))
   (let ((steps (ceiling (/ (float (length xs)) (float x)))))
     (loop for n from 0 below steps
-          collect (apply f n (subseq xs (* n x) (+ (* n x) x))))))
+          collect (apply f n (cl-subseq xs (* n x) (+ (* n x) x))))))
 
 ;; (pixel-mapx 4 (lambda (index &rest args) (print (format "%d: %S" index args))) '(1 2 3 4 5 6 7 8))
 
