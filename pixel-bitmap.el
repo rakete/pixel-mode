@@ -22,6 +22,7 @@
 ;; Nothing so far
 
 ;;; Code
+(require 'cl-lib)
 (require 'color)
 
 (defun pixel-normalize-color (type color)
@@ -76,7 +77,7 @@
          (colors (mapcar #'color-name-to-rgb (plist-get palette :colors)))
          (best-distance nil)
          (most-similar (car-safe colors)))
-    (dolist (rgb colors (apply #'color-rgb-to-hex most-similar))
+    (cl-dolist (rgb colors (apply #'color-rgb-to-hex most-similar))
       (let* ((r1 (nth 0 rgb))
              (g1 (nth 1 rgb))
              (b1 (nth 2 rgb))

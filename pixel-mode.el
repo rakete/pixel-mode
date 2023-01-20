@@ -283,7 +283,7 @@ Can be forced to used a certain string as comma with an optional COMMA argument.
 
 See also `pixel-find-comma' for details on what a source text is."
   (save-match-data
-    (let ((comma-re (concat "[" (regexp-quote (remove-duplicates (or comma (pixel-find-comma source)))) "]")))
+    (let ((comma-re (concat "[" (regexp-quote (cl-remove-duplicates (or comma (pixel-find-comma source)))) "]")))
       (string-match (concat "^[^0-9\\.]*\\(\\(?:[0-9\\.]+" comma-re "*\\)+\\)") source)
       (length (split-string (match-string 1 source) comma-re t)))))
 
@@ -623,7 +623,7 @@ See also `pixel-read-bitmap'."
                    (condition-case nil
                        (while (re-search-forward (pixel-regex :bitmap t :quick t) nil t)
                          (let ((overlays (overlays-at (point))))
-                           (dolist (ov overlays)
+                           (cl-dolist (ov overlays)
                              (let ((editor (overlay-get ov 'pixel-editor)))
                                (when editor
                                  (add-to-list 'result editor))))))
@@ -726,7 +726,7 @@ See also `pixel-editor-create' and `pixel-editor-remove'."
 ;;   (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
 ;;         (pixel-palette-cache pixel-global-palette-cache)
 ;;         (pixel-buffer-cache pixel-global-buffer-cache))
-;;     (dolist (editor (pixel-list-editor :buffer (current-buffer)))
+;;     (cl-dolist (editor (pixel-list-editor :buffer (current-buffer)))
 ;;       ;;(pixel-editor-save editor)
 ;;       (pixel-editor-remove editor)
 ;;       (add-to-list 'pixel-restore-editor-after-save-list (plist-get editor :id)))))
@@ -736,7 +736,7 @@ See also `pixel-editor-create' and `pixel-editor-remove'."
 ;;     (let ((pixel-bitmap-cache pixel-global-bitmap-cache)
 ;;           (pixel-palette-cache pixel-global-palette-cache)
 ;;           (pixel-buffer-cache pixel-global-buffer-cache))
-;;       (dolist (id pixel-restore-editor-after-save-list)
+;;       (cl-dolist (id pixel-restore-editor-after-save-list)
 ;;         (pixel-toggle-editor :id id)))
 ;;     (setq pixel-restore-editor-after-save-list '())
 ;;     (clrhash pixel-global-bitmap-cache)
@@ -750,7 +750,7 @@ See also `pixel-editor-create' and `pixel-editor-remove'."
              editor-list)
         (let ((buffer (get-buffer-create (concat "copy of " (buffer-name)))))
           (copy-to-buffer buffer (point-min) (point-max))
-          (dolist (editor editor-list)
+          (cl-dolist (editor editor-list)
             (with-current-buffer buffer
               (let ((ov (plist-get editor :ov-editor)))
                 (delete-region (overlay-start ov) (overlay-end ov)))))
@@ -791,7 +791,7 @@ See also `pixel-editor-create' and `pixel-editor-remove'."
           (pixel-buffer-cache (make-hash-table :test 'equal)))
       ;;(add-hook 'before-save-hook 'pixel-before-save)
       ;;(add-hook 'after-save-hook 'pixel-after-save)
-      (dolist (origin (pixel-list-bitmap :buffer (current-buffer) :list-origin t))
+      (cl-dolist (origin (pixel-list-bitmap :buffer (current-buffer) :list-origin t))
         (pixel-toggle-editor :origin origin)))))
 
 (provide 'pixel-mode)

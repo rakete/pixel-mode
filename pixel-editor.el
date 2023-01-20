@@ -51,6 +51,8 @@
 ;; of using the mouse.
 
 ;;; Code:
+(require 'cl-lib)
+
 (require 'pixel-bitmap nil 'noerror)
 
 ;;
@@ -400,7 +402,7 @@ An example of what this variable might look like:
 
 See also `pixel-toggle-editor' and `delete-overlay'."
   (let ((modified-state (buffer-modified-p)))
-    (dolist (key pixel-editor-overlays)
+    (cl-dolist (key pixel-editor-overlays)
       (when (eq key :ov-editor)
         (delete-region (overlay-start (plist-get editor key))
                        (overlay-end (plist-get editor key))))
@@ -514,7 +516,7 @@ code background respectivly.
         (pixel-editor-put editor :editor-background background)
         (pixel-editor-put editor :editor-zoomlevel 8)
         (pixel-editor-put editor :editor-indentation 20)
-        (dolist (key pixel-editor-overlays)
+        (cl-dolist (key pixel-editor-overlays)
           (cond ((eq :ov-complete key)
                  (when (eq last-pos (point-max))
                    (let ((modified-state (buffer-modified-p)))
@@ -624,7 +626,7 @@ so that many occurances of colors can be replaced in one batch."
     (with-current-buffer (overlay-buffer ov-array)
       (save-excursion
         (goto-char (overlay-start ov-array))
-        (dolist (p pixels)
+        (cl-dolist (p pixels)
           (let ((x (nth 0 p))
                 (y (nth 1 p))
                 (color (nth 2 p)))
@@ -681,7 +683,7 @@ See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-
             ;;   put not marked neighbours of n in neighbour-queue
             (when (eq (pixel-canvas-color editor center-x center-y) compare-color)
               (push (list center-x center-y fill-color fill-alpha) updates)
-              (dolist (neighbour (pixel-neighbours center-x center-y))
+              (cl-dolist (neighbour (pixel-neighbours center-x center-y))
                 (let ((neighbour-x (nth 0 neighbour))
                       (neighbour-y (nth 1 neighbour)))
                   (when (and (>= neighbour-x 0)
@@ -744,7 +746,7 @@ See also `pixel-make-action', `pixel-make-canvas-motion' and `pixel-make-canvas-
                   (setf (elt new-layer i) ov)
                   (push ov new-layer-overlays))
                 (push (list x y color alpha) updates)))))
-        (dolist (ov old-layer-overlays)
+        (cl-dolist (ov old-layer-overlays)
           (let ((x (overlay-get ov 'pixel-x))
                 (y (overlay-get ov 'pixel-y)))
             (unless (overlayp (elt new-layer (pixel-bitmap-index w x y)))
@@ -800,7 +802,7 @@ See also `pixel-canvas-point'."
 (defun pixel-canvas-discard (state)
   "Discard :layer-overlays from STATE."
   (let ((layer-overlays (plist-get state :layer-overlays)))
-    (dolist (ov layer-overlays)
+    (cl-dolist (ov layer-overlays)
       (delete-overlay ov))))
 
 (defun pixel-canvas-merge (editor state)
@@ -814,7 +816,7 @@ STATE because these are not neccessary to keep once the :updates are applied.
 
 See also `pixel-canvas-layer'."
   (pixel-canvas-discard state)
-  (dolist (u (plist-get state :updates))
+  (cl-dolist (u (plist-get state :updates))
     (let* ((x (nth 0 u))
            (y (nth 1 u))
            (color (nth 2 u))
@@ -1104,7 +1106,7 @@ See also `with-local-quit'."
                                                                                x y color alpha
                                                                                drag-x drag-y drag-color drag-alpha
                                                                                state))
-                                                (error (dolist (ov (plist-get state :layer-overlays))
+                                                (cl-error (cl-dolist (ov (plist-get state :layer-overlays))
                                                          (delete-overlay ov))))
                                         last-x drag-x
                                         last-y drag-y))))
@@ -1155,7 +1157,7 @@ See also `with-local-quit'."
                                                                         x y color alpha
                                                                         drag-x drag-y drag-color drag-alpha
                                                                         state))
-                                         (error (dolist (ov (plist-get state :layer-overlays))
+                                         (cl-error (cl-dolist (ov (plist-get state :layer-overlays))
                                                   (delete-overlay ov))))
                                  last-x drag-x
                                  last-y drag-y))))
