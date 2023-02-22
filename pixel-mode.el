@@ -777,9 +777,9 @@ See also `pixel-editor-create' and `pixel-editor-remove'."
   "Create pixel art right inside your programming buffers"
   :lighter " Pixel"
   :global nil
-  :keymap (let ((map (make-sparse-keymap)))
+  :keymap (let ((km (make-sparse-keymap)))
             ;;(define-key map (kbd "C-c C-c") 'pixel)
-            map)
+            km)
   (if (not pixel-mode)
       (progn
         (mapc 'pixel-editor-remove (pixel-list-editor :buffer (current-buffer)))
