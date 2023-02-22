@@ -53,6 +53,7 @@
 ;;; Code:
 (require 'cl-lib)
 
+(require 'pixel-mode)
 (require 'pixel-bitmap nil 'noerror)
 
 ;;
@@ -439,8 +440,8 @@ See also `pixel-editor-put' and `pixel-editor-state'."
   (unless (string-equal (plist-get bitmap :palette-id) (pixel-editor-get editor :palette-id))
     (pixel-editor-put editor :palette-background (nth 0 (plist-get palette :colors)))
     (pixel-editor-put editor :palette-foreground (car (last (plist-get palette :colors))))
-    (pixel-editor-put editor :palette-shortcuts (loop for c in (reverse (last (reverse (plist-get palette :colors)) 10))
-                                                      collect c)))
+    (pixel-editor-put editor :palette-shortcuts (cl-loop for c in (reverse (last (reverse (plist-get palette :colors)) 10))
+                                                         collect c)))
 
   (pixel-editor-put editor :palette-id (plist-get bitmap :palette-id))
 
@@ -454,7 +455,7 @@ See also `pixel-editor-put' and `pixel-editor-state'."
   (pixel-editor-put editor :bitmap-stride (plist-get bitmap :stride))
   (pixel-editor-put editor :bitmap-format (plist-get bitmap :format)))
 
-(defun* pixel-editor-create (origin &key (background nil) (foreground nil) (source-background nil))
+(cl-defun pixel-editor-create (origin &key (background nil) (foreground nil) (source-background nil))
   "Go through `pixel-editor-overlays' and create the overlays for an editor,
 return a plist describing the created editor.
 
@@ -940,21 +941,21 @@ See also `pixel-canvas-discard', `pixel-make-canvas-motion' and
                             (save-match-data
                               (pixel-find-palette :id new-palette))))
                  (new-array-string (mapconcat #'identity
-                                              (loop for i from 0 below (* new-width new-height)
-                                                    do (if (< w new-width)
-                                                           (setq w (1+ w))
-                                                         (setq w 1)
-                                                         (setq h (1+ h)))
-                                                    collect (let ((color (cond ((string-equal new-format "palette")
-                                                                                (prin1-to-string (condition-case nil (elt new-array i) (error default))))
-                                                                               ((string-equal new-format "rgb")
-                                                                                (mapconcat #'identity
-                                                                                           (mapcar #'prin1-to-string
-                                                                                                   (pixel-color-name-to-rgb new-type (condition-case nil (elt (plist-get palette :colors) (elt new-array i)) (error default))))
-                                                                                           comma)))))
-                                                              (concat color
-                                                                      (unless (eq i (1- (* new-width new-height))) (replace-regexp-in-string "[ \t]*" "" comma))
-                                                                      (when (and (eq w new-width) (< h (1- new-height))) "\n"))))
+                                              (cl-loop for i from 0 below (* new-width new-height)
+                                                       do (if (< w new-width)
+                                                              (setq w (1+ w))
+                                                            (setq w 1)
+                                                            (setq h (1+ h)))
+                                                       collect (let ((color (cond ((string-equal new-format "palette")
+                                                                                   (prin1-to-string (condition-case nil (elt new-array i) (error default))))
+                                                                                  ((string-equal new-format "rgb")
+                                                                                   (mapconcat #'identity
+                                                                                              (mapcar #'prin1-to-string
+                                                                                                      (pixel-color-name-to-rgb new-type (condition-case nil (elt (plist-get palette :colors) (elt new-array i)) (error default))))
+                                                                                              comma)))))
+                                                                 (concat color
+                                                                         (unless (eq i (1- (* new-width new-height))) (replace-regexp-in-string "[ \t]*" "" comma))
+                                                                         (when (and (eq w new-width) (< h (1- new-height))) "\n"))))
                                               " ")))
             (replace-match (concat  new-array-string "\n") t nil nil 9)))
         (pixel-canvas-refresh editor)
@@ -1206,7 +1207,7 @@ See also `pixel-make-action' and `pixel-canvas-color'."
       (pixel-editor-update editor :palette-foreground color)
       (pixel-editor-put editor :palette-foreground color))))
 
-(defun* pixel-make-action (editor action &rest args)
+(cl-defun pixel-make-action (editor action &rest args)
   "Create and return a lambda function to trigger a ACTION that is applied
 to the EDITOR and ARGS.
 
@@ -1220,7 +1221,7 @@ See also `pixel-make-mouse-action'."
     (interactive)
     (apply action (append (list editor) args))))
 
-(defun* pixel-make-mouse-action (editor action &rest args)
+(cl-defun pixel-make-mouse-action (editor action &rest args)
   "Special version of `pixel-make-action' for actions triggered by clicking
 with the mouse.
 

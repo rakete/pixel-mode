@@ -57,7 +57,7 @@
          (ba 0.0)
          (colors (plist-get palette :colors))
          (size (float (length colors))))
-    (loop for hex in colors
+    (cl-loop for hex in colors
           do (let* ((c (color-name-to-rgb hex))
                     (r (nth 0 c))
                     (g (nth 1 c))
@@ -140,13 +140,13 @@
 (defun pixel-bitmap-mapc (f bitmap)
   (let ((w (cdr (plist-get bitmap :width)))
         (h (cdr (plist-get bitmap :height))))
-    (loop for x from 0 below w
-          do (loop for y from 0 below h
-                   do (apply f `(,x ,y ,(pixel-bitmap-ref bitmap x y)))))))
+    (cl-loop for x from 0 below w
+             do (cl-loop for y from 0 below h
+                         do (apply f `(,x ,y ,(pixel-bitmap-ref bitmap x y)))))))
 
 ;; (pixel-bitmap-mapc (lambda (x y v) (print `(,x ,y ,v))) (pixel-make-bitmap :width 2 :h 2))
 
-(defun* pixel-make-bitmap (&key (width 16) (height 16))
+(cl-defun pixel-make-bitmap (&key (width 16) (height 16))
   (let* ((array (make-vector (* width height) 0)))
     (list :width width
           :height height
@@ -161,33 +161,33 @@
 ;;   (pixel-bitmap-set foo 2 3 2)
 ;;   (pixel-bitmap-ref foo 2 3))
 
-(defun* pixel-bitmap-set-diagonals (bitmap &key (gap 8) (color1 0) (color2 0))
+(cl-defun pixel-bitmap-set-diagonals (bitmap &key (gap 8) (color1 0) (color2 0))
   (let* ((w (plist-get bitmap :width))
          (h (plist-get bitmap :height))
          (n (/ w gap)))
-    (loop for j from 1 to h
-          do (loop for i from 1 to n
-                   do (let* ((y (- j 1))
-                             (k (- (* i gap) j))
-                             (x (if (< k 0) (+ w k) k)))
-                        (pixel-bitmap-set bitmap x y color1))))
+    (cl-loop for j from 1 to h
+             do (cl-loop for i from 1 to n
+                      do (let* ((y (- j 1))
+                                (k (- (* i gap) j))
+                                (x (if (< k 0) (+ w k) k)))
+                           (pixel-bitmap-set bitmap x y color1))))
     bitmap))
 
 ;; (print (assoc :array (pixel-bitmap-set-diagonals (pixel-make-bitmap :width 8 :h 8 :background 0) :gap 4 :color1 1)))
 
-(defun* pixel-bitmap-set-edges (bitmap &key (color1 0) (color2 0) (left t) (top t) (right t) (bottom t))
-  (loop for y from 0 below (plist-get bitmap :height)
-        do (loop for x from 0 below (plist-get bitmap :width)
-                 do (when (or (eq y 0)
-                              (eq y (- (plist-get bitmap :height) 1))
-                              (eq x 0)
-                              (eq x (- (plist-get bitmap :width) 1)))
-                      (pixel-bitmap-set bitmap x y color1))))
+(cl-defun pixel-bitmap-set-edges (bitmap &key (color1 0) (color2 0) (left t) (top t) (right t) (bottom t))
+  (cl-loop for y from 0 below (plist-get bitmap :height)
+           do (cl-loop for x from 0 below (plist-get bitmap :width)
+                       do (when (or (eq y 0)
+                                    (eq y (- (plist-get bitmap :height) 1))
+                                    (eq x 0)
+                                    (eq x (- (plist-get bitmap :width) 1)))
+                            (pixel-bitmap-set bitmap x y color1))))
   bitmap)
 
 ;; (pixel-bitmap-set-edges (pixel-make-bitmap :width 4 :h 4 :background 0) :color1 1)
 
-(defun* pixel-bitmap-set-alpha (bitmap &key (color -1))
+(cl-defun pixel-bitmap-set-alpha (bitmap &key (color -1))
   (let* ((array (make-vector (* (plist-get bitmap :width) (plist-get bitmap :h)) 1)))
     (pixel-bitmap-mapc (lambda (x y v) (when (not (eq v color))
                                          (aset array (pixel-bitmap-index bitmap x y) 0)))
@@ -238,8 +238,8 @@
       (insert "P3" "\n"
               (prin1-to-string w) " " (prin1-to-string h) "\n"
               "255" "\n")
-      (loop for n across b
-            do (insert (elt v n)))
+      (cl-loop for n across b
+               do (insert (elt v n)))
       (buffer-string))))
 
 ;; (let ((ppm (pixel-ppm (pixel-make-palette "#000000" "#ffffff" "#ff0000")
@@ -253,14 +253,14 @@
         (num-colors 0)
         (pixels nil))
     (with-temp-buffer
-      (loop for y from 0 below h
-            do (progn
-                 (insert "\"")
-                 (loop for x from 0 below w
-                       do (let ((n (pixel-bitmap-ref bitmap x y)))
-                            (when (> n num-colors) (setq num-colors n))
-                            (insert (format "%04d" n))))
-                 (insert "\"" (if (eq y (- h 1)) "};" ",\n"))))
+      (cl-loop for y from 0 below h
+               do (progn
+                    (insert "\"")
+                    (cl-loop for x from 0 below w
+                             do (let ((n (pixel-bitmap-ref bitmap x y)))
+                                  (when (> n num-colors) (setq num-colors n))
+                                  (insert (format "%04d" n))))
+                    (insert "\"" (if (eq y (- h 1)) "};" ",\n"))))
       (setq pixels (buffer-string)))
     (setq num-colors (+ num-colors 1))
     (with-temp-buffer
@@ -269,8 +269,8 @@
               "/* width height ncolors chars_per_pixel */" "\n"
               "\"" (prin1-to-string w) " " (prin1-to-string h) " " (prin1-to-string num-colors) " 4\"," "\n"
               "/* colors */" "\n")
-      (loop for n from 0 below num-colors
-            do (insert (concat "\"" (format "%04d" n) " s col" (prin1-to-string n) "\"," (unless (eq n (- num-colors 1)) "\n"))))
+      (cl-loop for n from 0 below num-colors
+               do (insert (concat "\"" (format "%04d" n) " s col" (prin1-to-string n) "\"," (unless (eq n (- num-colors 1)) "\n"))))
       (insert "\n"
               "/* pixels */" "\n"
               pixels)
